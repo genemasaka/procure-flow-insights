@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, AlertTriangle, CheckCircle, Bell } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, CheckCircle, Bell, Plus } from "lucide-react";
 import { useDeadlines } from "@/hooks/useContracts";
 import { format, differenceInDays } from "date-fns";
 
@@ -70,7 +70,10 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">Loading deadlines...</div>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-slate-600">Loading deadlines...</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -86,7 +89,10 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-red-600">Error loading deadlines</div>
+          <div className="text-center py-8 text-red-600">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+            <p>Error loading deadlines</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -107,56 +113,72 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {displayedDeadlines?.map((deadline) => {
-            const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
-            
-            return (
-              <div
-                key={deadline.id}
-                className={`p-4 rounded-lg border-l-4 ${getPriorityColor(deadline.priority)} transition-all duration-200 hover:shadow-md`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon(deadline.type)}
-                    <h4 className="font-semibold text-slate-900">{deadline.title}</h4>
+          {!deadlines || deadlines.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-600 mb-2">No deadlines yet</h3>
+              <p className="text-slate-500 mb-4">
+                Start adding contracts to track important dates and obligations
+              </p>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Contract
+              </Button>
+            </div>
+          ) : (
+            displayedDeadlines?.map((deadline) => {
+              const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
+              
+              return (
+                <div
+                  key={deadline.id}
+                  className={`p-4 rounded-lg border-l-4 ${getPriorityColor(deadline.priority)} transition-all duration-200 hover:shadow-md`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {getTypeIcon(deadline.type)}
+                      <h4 className="font-semibold text-slate-900">{deadline.title}</h4>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={getPriorityBadgeColor(deadline.priority)}>
+                        {deadline.priority}
+                      </Badge>
+                      <span className={`text-sm font-medium ${getUrgencyColor(daysRemaining)}`}>
+                        {daysRemaining} days
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={getPriorityBadgeColor(deadline.priority)}>
-                      {deadline.priority}
-                    </Badge>
-                    <span className={`text-sm font-medium ${getUrgencyColor(daysRemaining)}`}>
-                      {daysRemaining} days
-                    </span>
+                  
+                  <div className="text-sm text-slate-600 mb-2">
+                    <span className="font-medium">{deadline.contracts?.counterparty || 'No contract'}</span> • {format(new Date(deadline.due_date), 'MMM d, yyyy')}
+                  </div>
+                  
+                  {deadline.description && (
+                    <p className="text-sm text-slate-700 mb-3">{deadline.description}</p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {daysRemaining <= 14 && (
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      )}
+                      <span className="text-xs text-slate-500">
+                        Due {format(new Date(deadline.due_date), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm">
+                        Snooze
+                      </Button>
+                      <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                        Action
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="text-sm text-slate-600 mb-2">
-                  <span className="font-medium">{deadline.contracts?.counterparty}</span> • {format(new Date(deadline.due_date), 'MMM d, yyyy')}
-                </div>
-                
-                <p className="text-sm text-slate-700 mb-3">{deadline.description}</p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {daysRemaining <= 14 && (
-                      <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    )}
-                    <span className="text-xs text-slate-500">
-                      Due {format(new Date(deadline.due_date), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Snooze
-                    </Button>
-                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                      Action
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {!expanded && deadlines && deadlines.length > 4 && (

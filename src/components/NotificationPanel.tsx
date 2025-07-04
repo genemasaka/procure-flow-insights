@@ -11,58 +11,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Bell, Calendar, AlertTriangle, Clock, CheckCircle } from "lucide-react";
-
-interface Notification {
-  id: string;
-  type: 'deadline' | 'renewal' | 'risk' | 'milestone';
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
+import { useDeadlines } from "@/hooks/useContracts";
+import { differenceInDays, format } from "date-fns";
 
 export const NotificationPanel = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'deadline',
-      title: 'Contract Renewal Due',
-      message: 'Global Maritime Services Agreement renewal notice required in 5 days',
-      time: '2 hours ago',
-      read: false
-    },
-    {
-      id: '2',
-      type: 'risk',
-      title: 'High Risk Alert',
-      message: 'Payment terms anomaly detected in TechEquip Solutions contract',
-      time: '4 hours ago',
-      read: false
-    },
-    {
-      id: '3',
-      type: 'milestone',
-      title: 'Payment Milestone',
-      message: 'Q4 payment of $300,000 due for Manufacturing Supply Contract',
-      time: '1 day ago',
-      read: true
-    }
-  ]);
+  const { data: deadlines } = useDeadlines();
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
+  // Create notifications from deadlines
+  const notifications = deadlines?.map(deadline => {
+    const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
+    let type: 'deadline' | 'renewal' | 'risk' | 'milestone' = 'deadline';
+    
+    if (deadline.type === 'renewal') type = 'renewal';
+    else if (deadline.type === 'milestone') type = 'milestone';
+    else if (daysRemaining <= 7) type = 'risk';
+
+    return {
+      id: deadline.id,
+      type,
+      title: deadline.title,
+      message: deadline.description || `${deadline.title} due in ${daysRemaining} days`,
+      time: daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} days`,
+      read: readNotifications.has(deadline.id),
+      daysRemaining
+    };
+  }).filter(n => n.daysRemaining <= 30) || []; // Only show notifications for next 30 days
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
+    setReadNotifications(prev => new Set([...prev, id]));
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+    setReadNotifications(new Set(notifications.map(n => n.id)));
   };
 
   const getIcon = (type: string) => {
@@ -90,7 +73,7 @@ export const NotificationPanel = () => {
               variant="destructive" 
               className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
             >
-              {unreadCount}
+              {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
         </Button>
@@ -108,7 +91,9 @@ export const NotificationPanel = () => {
         
         {notifications.length === 0 ? (
           <div className="p-4 text-center text-slate-500 text-sm">
-            No notifications
+            <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p>No notifications</p>
+            <p className="text-xs mt-1">You're all caught up!</p>
           </div>
         ) : (
           <div className="max-h-96 overflow-y-auto">
@@ -136,7 +121,12 @@ export const NotificationPanel = () => {
                     <p className="text-xs text-slate-600 mb-1 line-clamp-2">
                       {notification.message}
                     </p>
-                    <p className="text-xs text-slate-400">{notification.time}</p>
+                    <p className={`text-xs ${
+                      notification.daysRemaining <= 0 ? 'text-red-500 font-medium' :
+                      notification.daysRemaining <= 7 ? 'text-amber-500' : 'text-slate-400'
+                    }`}>
+                      {notification.time}
+                    </p>
                   </div>
                 </div>
               </DropdownMenuItem>

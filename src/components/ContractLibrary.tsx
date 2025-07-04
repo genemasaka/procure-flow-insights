@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, Calendar, DollarSign, AlertTriangle } from "lucide-react";
+import { Search, FileText, Calendar, DollarSign, Plus, Upload } from "lucide-react";
 import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
 
@@ -52,7 +52,8 @@ export const ContractLibrary = () => {
       <div className="space-y-6">
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-12 text-center">
-            <div className="text-center py-8">Loading contracts...</div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-slate-600">Loading contracts...</p>
           </CardContent>
         </Card>
       </div>
@@ -113,87 +114,107 @@ export const ContractLibrary = () => {
 
       {/* Contract List */}
       <div className="grid gap-4">
-        {filteredContracts?.map((contract) => (
-          <Card key={contract.id} className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                    {contract.title}
-                  </h3>
-                  <p className="text-slate-600 mb-2">{contract.counterparty}</p>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="outline" className={getStatusColor(contract.status)}>
-                      {contract.status}
-                    </Badge>
-                    <Badge variant="outline">{contract.contract_type}</Badge>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-slate-900 mb-1">
-                    {formatCurrency(contract.contract_value)}
-                  </div>
-                  <div className="text-sm text-slate-500">Contract Value</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <div className="text-sm font-medium text-slate-700">Effective Date</div>
-                    <div className="text-sm text-slate-600">
-                      {contract.effective_date ? format(new Date(contract.effective_date), 'MMM d, yyyy') : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <div className="text-sm font-medium text-slate-700">Expiration Date</div>
-                    <div className="text-sm text-slate-600">
-                      {contract.expiration_date ? format(new Date(contract.expiration_date), 'MMM d, yyyy') : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <div className="text-sm font-medium text-slate-700">Currency</div>
-                    <div className="text-sm text-slate-600">{contract.currency || 'USD'}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {contract.renewal_notice_days || 30} day notice
-                  </Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    View Details
-                  </Button>
-                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                    Edit
-                  </Button>
-                </div>
+        {!contracts || contracts.length === 0 ? (
+          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-12 text-center">
+              <FileText className="w-16 h-16 text-slate-300 mx-auto mb-6" />
+              <h3 className="text-xl font-semibold text-slate-600 mb-2">No contracts yet</h3>
+              <p className="text-slate-500 mb-6">
+                Get started by uploading your first contract document or creating a new contract entry
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Contract
+                </Button>
+                <Button variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New
+                </Button>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        ) : filteredContracts?.length === 0 ? (
+          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-12 text-center">
+              <Search className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-600 mb-2">No contracts found</h3>
+              <p className="text-slate-500">Try adjusting your search criteria or filters</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredContracts?.map((contract) => (
+            <Card key={contract.id} className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                      {contract.title}
+                    </h3>
+                    <p className="text-slate-600 mb-2">{contract.counterparty}</p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="outline" className={getStatusColor(contract.status)}>
+                        {contract.status}
+                      </Badge>
+                      <Badge variant="outline">{contract.contract_type}</Badge>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-slate-900 mb-1">
+                      {formatCurrency(contract.contract_value)}
+                    </div>
+                    <div className="text-sm text-slate-500">Contract Value</div>
+                  </div>
+                </div>
 
-      {filteredContracts?.length === 0 && (
-        <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
-          <CardContent className="p-12 text-center">
-            <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-600 mb-2">No contracts found</h3>
-            <p className="text-slate-500">Try adjusting your search criteria or filters</p>
-          </CardContent>
-        </Card>
-      )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Effective Date</div>
+                      <div className="text-sm text-slate-600">
+                        {contract.effective_date ? format(new Date(contract.effective_date), 'MMM d, yyyy') : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Expiration Date</div>
+                      <div className="text-sm text-slate-600">
+                        {contract.expiration_date ? format(new Date(contract.expiration_date), 'MMM d, yyyy') : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Currency</div>
+                      <div className="text-sm text-slate-600">{contract.currency || 'USD'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {contract.renewal_notice_days || 30} day notice
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      View Details
+                    </Button>
+                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 };

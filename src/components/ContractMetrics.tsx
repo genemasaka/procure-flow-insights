@@ -50,10 +50,14 @@ export const ContractMetrics = () => {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-slate-900">{metrics.total}</div>
-          <div className="flex items-center mt-2">
-            <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-sm text-green-600">+12% from last month</span>
-          </div>
+          {metrics.total > 0 ? (
+            <div className="flex items-center mt-2">
+              <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+              <span className="text-sm text-green-600">Active portfolio</span>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500 mt-2">No contracts yet</div>
+          )}
         </CardContent>
       </Card>
 
@@ -84,7 +88,9 @@ export const ContractMetrics = () => {
           <div className="text-3xl font-bold text-green-600">{metrics.active}</div>
           <div className="flex items-center mt-2">
             <Shield className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-sm text-green-600">Compliant</span>
+            <span className="text-sm text-green-600">
+              {metrics.active > 0 ? 'Compliant' : 'Ready to start'}
+            </span>
           </div>
         </CardContent>
       </Card>

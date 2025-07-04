@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, AlertCircle, CheckCircle, X } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle, X, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
@@ -120,7 +120,7 @@ export const DocumentUpload = () => {
               handleFileSelect(e.dataTransfer.files);
             }}
           >
-            <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <FileUp className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">
               Drop files here or click to browse
             </h3>

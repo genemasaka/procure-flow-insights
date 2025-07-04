@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Brain, TrendingUp, AlertTriangle, Target, Zap } from "lucide-react";
+import { Brain, TrendingUp, AlertTriangle, Target, Zap, Plus, Lightbulb } from "lucide-react";
 import { useAIInsights } from "@/hooks/useContracts";
 
 interface AIInsightsProps {
@@ -66,7 +66,10 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">Loading insights...</div>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+            <p className="mt-2 text-slate-600">Analyzing contracts...</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -82,7 +85,10 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-red-600">Error loading insights</div>
+          <div className="text-center py-8 text-red-600">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+            <p>Error loading insights</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -103,49 +109,63 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {displayedInsights?.map((insight) => (
-            <div
-              key={insight.id}
-              className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {getTypeIcon(insight.insight_type)}
-                  <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
-                    {insight.insight_type}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
-                    {insight.impact} impact
-                  </span>
-                  {insight.actionable && (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      Actionable
+          {!insights || insights.length === 0 ? (
+            <div className="text-center py-8">
+              <Lightbulb className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-600 mb-2">No insights yet</h3>
+              <p className="text-slate-500 mb-4">
+                Upload contracts to get AI-powered insights about risks, opportunities, and trends
+              </p>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Upload Contract
+              </Button>
+            </div>
+          ) : (
+            displayedInsights?.map((insight) => (
+              <div
+                key={insight.id}
+                className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {getTypeIcon(insight.insight_type)}
+                    <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
+                      {insight.insight_type}
                     </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
+                      {insight.impact} impact
+                    </span>
+                    {insight.actionable && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        Actionable
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
+                <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Confidence:</span>
+                      <Progress value={insight.confidence} className="w-16 h-2" />
+                      <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
+                    </div>
+                  </div>
+                  {insight.actionable && (
+                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                      Take Action
+                    </Button>
                   )}
                 </div>
               </div>
-
-              <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
-              <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">Confidence:</span>
-                    <Progress value={insight.confidence} className="w-16 h-2" />
-                    <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
-                  </div>
-                </div>
-                {insight.actionable && (
-                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                    Take Action
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {!expanded && insights && insights.length > 3 && (
@@ -156,7 +176,7 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
           </div>
         )}
 
-        {expanded && (
+        {expanded && insights && insights.length > 0 && (
           <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
             <div className="flex items-center gap-2 mb-2">
               <Brain className="w-5 h-5 text-blue-600" />
@@ -176,8 +196,8 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
                 <div className="text-xs text-green-700">Savings Potential</div>
               </div>
               <div>
-                <div className="text-lg font-bold text-purple-900">8</div>
-                <div className="text-xs text-purple-700">Actions Available</div>
+                <div className="text-lg font-bold text-purple-900">{insights.length}</div>
+                <div className="text-xs text-purple-700">Active Insights</div>
               </div>
             </div>
           </div>
