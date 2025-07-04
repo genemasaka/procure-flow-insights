@@ -1,288 +1,215 @@
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Image, AlertCircle, CheckCircle, Brain } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
   id: string;
   name: string;
   size: number;
-  type: string;
-  status: 'uploading' | 'processing' | 'analyzing' | 'completed' | 'error';
+  status: 'uploading' | 'processing' | 'completed' | 'error';
   progress: number;
-  extractedData?: {
-    counterparties: string[];
-    effectiveDate: string;
-    renewalDate: string;
-    monetaryValues: string[];
-  };
 }
 
 export const DocumentUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
+  const handleFileSelect = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    processFiles(droppedFiles);
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      processFiles(selectedFiles);
-    }
-  };
-
-  const processFiles = (fileList: File[]) => {
-    const newFiles: UploadedFile[] = fileList.map(file => ({
+    const newFiles: UploadedFile[] = Array.from(selectedFiles).map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
       size: file.size,
-      type: file.type,
       status: 'uploading',
       progress: 0
     }));
 
     setFiles(prev => [...prev, ...newFiles]);
 
-    // Simulate file processing
+    // Simulate upload process
     newFiles.forEach(file => {
-      simulateFileProcessing(file.id);
-    });
-
-    toast({
-      title: "Files uploaded successfully",
-      description: `${fileList.length} file(s) are being processed.`,
+      simulateUpload(file.id);
     });
   };
 
-  const simulateFileProcessing = (fileId: string) => {
-    // Simulate upload progress
-    const uploadInterval = setInterval(() => {
-      setFiles(prev => prev.map(file => {
-        if (file.id === fileId && file.status === 'uploading') {
-          const newProgress = Math.min(file.progress + 10, 100);
-          if (newProgress === 100) {
-            clearInterval(uploadInterval);
-            setTimeout(() => simulateOCRProcessing(fileId), 500);
-            return { ...file, progress: newProgress, status: 'processing' };
-          }
-          return { ...file, progress: newProgress };
-        }
-        return file;
-      }));
-    }, 200);
-  };
-
-  const simulateOCRProcessing = (fileId: string) => {
-    setTimeout(() => {
+  const simulateUpload = (fileId: string) => {
+    const interval = setInterval(() => {
       setFiles(prev => prev.map(file => {
         if (file.id === fileId) {
-          return { ...file, status: 'analyzing', progress: 0 };
-        }
-        return file;
-      }));
-      
-      simulateAIAnalysis(fileId);
-    }, 1000);
-  };
-
-  const simulateAIAnalysis = (fileId: string) => {
-    const analysisInterval = setInterval(() => {
-      setFiles(prev => prev.map(file => {
-        if (file.id === fileId && file.status === 'analyzing') {
-          const newProgress = Math.min(file.progress + 15, 100);
-          if (newProgress === 100) {
-            clearInterval(analysisInterval);
-            return {
-              ...file,
-              progress: newProgress,
-              status: 'completed',
-              extractedData: {
-                counterparties: ['ACME Corp', 'Global Shipping Ltd'],
-                effectiveDate: '2024-01-15',
-                renewalDate: '2024-12-31',
-                monetaryValues: ['$125,000', '$15,000']
-              }
-            };
+          if (file.progress < 100) {
+            return { ...file, progress: file.progress + 10 };
+          } else if (file.status === 'uploading') {
+            return { ...file, status: 'processing' };
+          } else if (file.status === 'processing') {
+            return { ...file, status: 'completed' };
           }
-          return { ...file, progress: newProgress };
         }
         return file;
       }));
     }, 300);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      setFiles(prev => prev.map(file => 
+        file.id === fileId ? { ...file, status: 'completed', progress: 100 } : file
+      ));
+      
+      toast({
+        title: "Upload Complete",
+        description: "Contract document has been processed successfully.",
+      });
+    }, 3500);
   };
 
-  const getStatusIcon = (status: UploadedFile['status']) => {
-    switch (status) {
-      case 'uploading':
-        return <Upload className="w-4 h-4 text-blue-500 animate-pulse" />;
-      case 'processing':
-        return <FileText className="w-4 h-4 text-amber-500 animate-pulse" />;
-      case 'analyzing':
-        return <Brain className="w-4 h-4 text-purple-500 animate-pulse" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-    }
-  };
-
-  const getStatusText = (status: UploadedFile['status']) => {
-    switch (status) {
-      case 'uploading':
-        return 'Uploading...';
-      case 'processing':
-        return 'Running OCR...';
-      case 'analyzing':
-        return 'AI Analysis...';
-      case 'completed':
-        return 'Completed';
-      case 'error':
-        return 'Error';
-    }
+  const removeFile = (fileId: string) => {
+    setFiles(prev => prev.filter(file => file.id !== fileId));
   };
 
   const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Byte';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)).toString());
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+      default:
+        return <FileText className="w-5 h-5 text-blue-500" />;
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Upload Area */}
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5" />
-            Document Upload
+            Upload Contract Documents
           </CardTitle>
           <CardDescription>
-            Upload PDF, Word documents, or images for AI-powered contract analysis
+            Upload PDF, Word, or image files to extract contract information automatically
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-              isDragging
-                ? 'border-blue-500 bg-blue-50/50'
-                : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/50'
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              isDragOver 
+                ? 'border-blue-400 bg-blue-50' 
+                : 'border-slate-300 hover:border-slate-400'
             }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              handleFileSelect(e.dataTransfer.files);
+            }}
           >
-            <div className="flex flex-col items-center space-y-4">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Drop files here or click to upload
-                </h3>
-                <p className="text-slate-500 mt-1">
-                  Supports PDF, DOC, DOCX, PNG, JPG (max 10MB each)
-                </p>
-              </div>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                <Upload className="w-4 h-4 mr-2" />
+            <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">
+              Drop files here or click to browse
+            </h3>
+            <p className="text-slate-500 mb-4">
+              Supports PDF, DOC, DOCX, JPG, PNG files up to 10MB
+            </p>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={(e) => handleFileSelect(e.target.files)}
+              className="hidden"
+              id="file-upload"
+            />
+            <Button asChild className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <label htmlFor="file-upload" className="cursor-pointer">
                 Choose Files
-              </Button>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
+              </label>
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* File Processing List */}
       {files.length > 0 && (
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Processing Queue</CardTitle>
+            <CardTitle>Upload Progress</CardTitle>
             <CardDescription>
-              Track the status of your uploaded documents
+              Track the processing status of your uploaded documents
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {files.map((file) => (
-                <div key={file.id} className="border border-slate-200 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(file.status)}
-                      <div>
-                        <h4 className="font-medium text-slate-900">{file.name}</h4>
-                        <p className="text-sm text-slate-500">
-                          {formatFileSize(file.size)} • {getStatusText(file.status)}
+                <div key={file.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg">
+                  {getStatusIcon(file.status)}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 truncate">{file.name}</p>
+                    <p className="text-sm text-slate-500">{formatFileSize(file.size)}</p>
+                    {file.status !== 'completed' && file.status !== 'error' && (
+                      <div className="mt-2">
+                        <Progress value={file.progress} className="h-2" />
+                        <p className="text-xs text-slate-500 mt-1">
+                          {file.status === 'uploading' ? 'Uploading...' : 'Processing...'}
                         </p>
                       </div>
-                    </div>
-                    <Badge variant={file.status === 'completed' ? 'default' : 'secondary'}>
-                      {file.status}
-                    </Badge>
+                    )}
+                    {file.status === 'completed' && (
+                      <p className="text-sm text-green-600 mt-1">
+                        ✓ Processed successfully
+                      </p>
+                    )}
                   </div>
-                  
-                  {file.status !== 'completed' && (
-                    <Progress value={file.progress} className="w-full" />
-                  )}
-
-                  {file.status === 'completed' && file.extractedData && (
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                      <h5 className="font-medium text-green-900 mb-2">Extracted Information</h5>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium text-slate-700">Counterparties:</span>
-                          <div className="mt-1">
-                            {file.extractedData.counterparties.map((party, idx) => (
-                              <Badge key={idx} variant="outline" className="mr-1">
-                                {party}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-700">Key Dates:</span>
-                          <p className="text-slate-600 mt-1">
-                            Effective: {file.extractedData.effectiveDate}<br/>
-                            Renewal: {file.extractedData.renewalDate}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(file.id)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
+
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FileText className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-2">AI-Powered Contract Analysis</h3>
+              <p className="text-blue-800 text-sm mb-3">
+                Our AI automatically extracts key information from your contracts including:
+              </p>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Contract parties and key terms</li>
+                <li>• Important dates and deadlines</li>
+                <li>• Financial terms and obligations</li>
+                <li>• Risk assessment and recommendations</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -1,27 +1,16 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { ContractLibrary } from "@/components/ContractLibrary";
 import { DeadlineTimeline } from "@/components/DeadlineTimeline";
 import { AIInsights } from "@/components/AIInsights";
 import { NotificationPanel } from "@/components/NotificationPanel";
-import { FileText, Calendar, Brain, Bell, TrendingUp, Shield } from "lucide-react";
+import { ContractMetrics } from "@/components/ContractMetrics";
+import { FileText, Calendar, Brain, Bell, TrendingUp } from "lucide-react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
-
-  // Mock data for demonstration
-  const contractStats = {
-    total: 47,
-    expiringSoon: 8,
-    active: 39,
-    riskScore: 72
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -47,56 +36,8 @@ const Index = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">Total Contracts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{contractStats.total}</div>
-              <div className="flex items-center mt-2">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">+12% from last month</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">Expiring Soon</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600">{contractStats.expiringSoon}</div>
-              <div className="flex items-center mt-2">
-                <Calendar className="w-4 h-4 text-amber-500 mr-1" />
-                <span className="text-sm text-amber-600">Next 30 days</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">Active Contracts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{contractStats.active}</div>
-              <div className="flex items-center mt-2">
-                <Shield className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">Compliant</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">Risk Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{contractStats.riskScore}</div>
-              <Progress value={contractStats.riskScore} className="mt-2" />
-              <span className="text-sm text-slate-500 mt-1">Portfolio health</span>
-            </CardContent>
-          </Card>
+        <div className="mb-8">
+          <ContractMetrics />
         </div>
 
         {/* Main Content Tabs */}
