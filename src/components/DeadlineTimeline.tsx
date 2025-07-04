@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, AlertTriangle, CheckCircle, Bell, Plus, Snooze } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, CheckCircle, Bell, Plus, Timer } from "lucide-react";
 import { useDeadlines } from "@/hooks/useContracts";
 import { format, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -252,7 +251,7 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
                         onClick={() => handleSnooze(deadline.id)}
                         disabled={isActioning}
                       >
-                        <Snooze className="w-4 h-4 mr-1" />
+                        <Timer className="w-4 h-4 mr-1" />
                         Snooze
                       </Button>
                       <Button 
