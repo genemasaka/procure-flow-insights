@@ -3,67 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, AlertTriangle, CheckCircle, Bell } from "lucide-react";
-
-interface DeadlineItem {
-  id: string;
-  title: string;
-  type: 'renewal' | 'payment' | 'notice' | 'milestone';
-  contract: string;
-  date: string;
-  daysRemaining: number;
-  priority: 'high' | 'medium' | 'low';
-  description: string;
-}
-
-const mockDeadlines: DeadlineItem[] = [
-  {
-    id: '1',
-    title: 'Contract Renewal Notice',
-    type: 'notice',
-    contract: 'Global Maritime Ltd',
-    date: '2024-07-15',
-    daysRemaining: 12,
-    priority: 'high',
-    description: 'Send 30-day renewal notice required'
-  },
-  {
-    id: '2',
-    title: 'Equipment Lease Renewal',
-    type: 'renewal',
-    contract: 'TechEquip Solutions',
-    date: '2024-08-15',
-    daysRemaining: 43,
-    priority: 'medium',
-    description: 'Lease agreement expires, renewal decision needed'
-  },
-  {
-    id: '3',
-    title: 'Quarterly Payment Due',
-    type: 'payment',
-    contract: 'ACME Manufacturing',
-    date: '2024-07-31',
-    daysRemaining: 28,
-    priority: 'high',
-    description: 'Q3 payment milestone - $300,000'
-  },
-  {
-    id: '4',
-    title: 'Compliance Review',
-    type: 'milestone',
-    contract: 'CloudTech Inc',
-    date: '2024-09-01',
-    daysRemaining: 60,
-    priority: 'low',
-    description: 'Annual compliance audit required'
-  }
-];
+import { useDeadlines } from "@/hooks/useContracts";
+import { format, differenceInDays } from "date-fns";
 
 interface DeadlineTimelineProps {
   expanded?: boolean;
 }
 
 export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) => {
-  const getTypeIcon = (type: DeadlineItem['type']) => {
+  const { data: deadlines, isLoading, error } = useDeadlines();
+
+  const getTypeIcon = (type: string) => {
     switch (type) {
       case 'renewal':
         return <Calendar className="w-4 h-4" />;
@@ -73,10 +23,12 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
         return <Bell className="w-4 h-4" />;
       case 'milestone':
         return <CheckCircle className="w-4 h-4" />;
+      default:
+        return <Calendar className="w-4 h-4" />;
     }
   };
 
-  const getPriorityColor = (priority: DeadlineItem['priority']) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
         return 'border-red-200 bg-red-50';
@@ -84,10 +36,12 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
         return 'border-yellow-200 bg-yellow-50';
       case 'low':
         return 'border-green-200 bg-green-50';
+      default:
+        return 'border-gray-200 bg-gray-50';
     }
   };
 
-  const getPriorityBadgeColor = (priority: DeadlineItem['priority']) => {
+  const getPriorityBadgeColor = (priority: string) => {
     switch (priority) {
       case 'high':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -95,6 +49,8 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'low':
         return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -104,7 +60,39 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
     return 'text-green-600';
   };
 
-  const displayedDeadlines = expanded ? mockDeadlines : mockDeadlines.slice(0, 4);
+  if (isLoading) {
+    return (
+      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Upcoming Deadlines
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">Loading deadlines...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Upcoming Deadlines
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-red-600">Error loading deadlines</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const displayedDeadlines = expanded ? deadlines : deadlines?.slice(0, 4);
 
   return (
     <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -119,58 +107,62 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {displayedDeadlines.map((deadline, index) => (
-            <div
-              key={deadline.id}
-              className={`p-4 rounded-lg border-l-4 ${getPriorityColor(deadline.priority)} transition-all duration-200 hover:shadow-md`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  {getTypeIcon(deadline.type)}
-                  <h4 className="font-semibold text-slate-900">{deadline.title}</h4>
+          {displayedDeadlines?.map((deadline) => {
+            const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
+            
+            return (
+              <div
+                key={deadline.id}
+                className={`p-4 rounded-lg border-l-4 ${getPriorityColor(deadline.priority)} transition-all duration-200 hover:shadow-md`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {getTypeIcon(deadline.type)}
+                    <h4 className="font-semibold text-slate-900">{deadline.title}</h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={getPriorityBadgeColor(deadline.priority)}>
+                      {deadline.priority}
+                    </Badge>
+                    <span className={`text-sm font-medium ${getUrgencyColor(daysRemaining)}`}>
+                      {daysRemaining} days
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={getPriorityBadgeColor(deadline.priority)}>
-                    {deadline.priority}
-                  </Badge>
-                  <span className={`text-sm font-medium ${getUrgencyColor(deadline.daysRemaining)}`}>
-                    {deadline.daysRemaining} days
-                  </span>
+                
+                <div className="text-sm text-slate-600 mb-2">
+                  <span className="font-medium">{deadline.contracts?.counterparty}</span> • {format(new Date(deadline.due_date), 'MMM d, yyyy')}
+                </div>
+                
+                <p className="text-sm text-slate-700 mb-3">{deadline.description}</p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {daysRemaining <= 14 && (
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    )}
+                    <span className="text-xs text-slate-500">
+                      Due {format(new Date(deadline.due_date), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      Snooze
+                    </Button>
+                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                      Action
+                    </Button>
+                  </div>
                 </div>
               </div>
-              
-              <div className="text-sm text-slate-600 mb-2">
-                <span className="font-medium">{deadline.contract}</span> • {deadline.date}
-              </div>
-              
-              <p className="text-sm text-slate-700 mb-3">{deadline.description}</p>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {deadline.daysRemaining <= 14 && (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  )}
-                  <span className="text-xs text-slate-500">
-                    Due {deadline.date}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    Snooze
-                  </Button>
-                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                    Action
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {!expanded && mockDeadlines.length > 4 && (
+        {!expanded && deadlines && deadlines.length > 4 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
             <Button variant="outline" className="w-full">
-              View All Deadlines ({mockDeadlines.length - 4} more)
+              View All Deadlines ({deadlines.length - 4} more)
             </Button>
           </div>
         )}

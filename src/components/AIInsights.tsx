@@ -4,62 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Brain, TrendingUp, AlertTriangle, Target, Zap } from "lucide-react";
-
-interface InsightItem {
-  id: string;
-  type: 'risk' | 'opportunity' | 'anomaly' | 'trend';
-  title: string;
-  description: string;
-  impact: 'high' | 'medium' | 'low';
-  confidence: number;
-  actionable: boolean;
-}
-
-const mockInsights: InsightItem[] = [
-  {
-    id: '1',
-    type: 'risk',
-    title: 'High Renewal Concentration',
-    description: '68% of contracts by value expire in Q4 2024, creating significant renewal risk and potential service disruption.',
-    impact: 'high',
-    confidence: 92,
-    actionable: true
-  },
-  {
-    id: '2',
-    type: 'anomaly',
-    title: 'Unusual Payment Terms Detected',
-    description: 'TechEquip Solutions contract has 45-day payment terms vs. industry standard 30 days.',
-    impact: 'medium',
-    confidence: 87,
-    actionable: true
-  },
-  {
-    id: '3',
-    type: 'opportunity',
-    title: 'Bulk Renewal Savings',
-    description: 'Consolidating 3 shipping contracts with Global Maritime could yield 15-20% cost savings.',
-    impact: 'high',
-    confidence: 78,
-    actionable: true
-  },
-  {
-    id: '4',
-    type: 'trend',
-    title: 'Contract Value Inflation',
-    description: 'Average contract values increased 12% YoY, outpacing industry inflation by 3%.',
-    impact: 'medium',
-    confidence: 95,
-    actionable: false
-  }
-];
+import { useAIInsights } from "@/hooks/useContracts";
 
 interface AIInsightsProps {
   expanded?: boolean;
 }
 
 export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
-  const getTypeIcon = (type: InsightItem['type']) => {
+  const { data: insights, isLoading, error } = useAIInsights();
+
+  const getTypeIcon = (type: string) => {
     switch (type) {
       case 'risk':
         return <AlertTriangle className="w-4 h-4 text-red-500" />;
@@ -69,10 +23,12 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
         return <Zap className="w-4 h-4 text-purple-500" />;
       case 'trend':
         return <TrendingUp className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Brain className="w-4 h-4" />;
     }
   };
 
-  const getTypeColor = (type: InsightItem['type']) => {
+  const getTypeColor = (type: string) => {
     switch (type) {
       case 'risk':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -82,10 +38,12 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'trend':
         return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const getImpactColor = (impact: InsightItem['impact']) => {
+  const getImpactColor = (impact: string) => {
     switch (impact) {
       case 'high':
         return 'text-red-600';
@@ -93,10 +51,44 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
         return 'text-yellow-600';
       case 'low':
         return 'text-green-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
-  const displayedInsights = expanded ? mockInsights : mockInsights.slice(0, 3);
+  if (isLoading) {
+    return (
+      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5" />
+            AI Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">Loading insights...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5" />
+            AI Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-red-600">Error loading insights</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const displayedInsights = expanded ? insights : insights?.slice(0, 3);
 
   return (
     <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -111,16 +103,16 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {displayedInsights.map((insight) => (
+          {displayedInsights?.map((insight) => (
             <div
               key={insight.id}
               className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  {getTypeIcon(insight.type)}
-                  <Badge variant="outline" className={getTypeColor(insight.type)}>
-                    {insight.type}
+                  {getTypeIcon(insight.insight_type)}
+                  <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
+                    {insight.insight_type}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -156,10 +148,10 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
           ))}
         </div>
 
-        {!expanded && mockInsights.length > 3 && (
+        {!expanded && insights && insights.length > 3 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
             <Button variant="outline" className="w-full">
-              View All Insights ({mockInsights.length - 3} more)
+              View All Insights ({insights.length - 3} more)
             </Button>
           </div>
         )}

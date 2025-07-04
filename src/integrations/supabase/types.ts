@@ -9,7 +9,204 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      ai_insights: {
+        Row: {
+          actionable: boolean | null
+          confidence: number
+          contract_id: string | null
+          created_at: string
+          description: string
+          id: string
+          impact: string
+          insight_type: string
+          title: string
+        }
+        Insert: {
+          actionable?: boolean | null
+          confidence: number
+          contract_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          impact: string
+          insight_type: string
+          title: string
+        }
+        Update: {
+          actionable?: boolean | null
+          confidence?: number
+          contract_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          impact?: string
+          insight_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          contract_type: string
+          contract_value: number | null
+          counterparty: string
+          created_at: string
+          currency: string | null
+          effective_date: string | null
+          expiration_date: string | null
+          file_name: string | null
+          file_path: string | null
+          hs_codes: string[] | null
+          id: string
+          renewal_notice_days: number | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          contract_type: string
+          contract_value?: number | null
+          counterparty: string
+          created_at?: string
+          currency?: string | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          hs_codes?: string[] | null
+          id?: string
+          renewal_notice_days?: number | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          contract_type?: string
+          contract_value?: number | null
+          counterparty?: string
+          created_at?: string
+          currency?: string | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          hs_codes?: string[] | null
+          id?: string
+          renewal_notice_days?: number | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      deadlines: {
+        Row: {
+          contract_id: string | null
+          created_at: string
+          description: string | null
+          due_date: string
+          id: string
+          notification_sent: boolean | null
+          priority: string
+          status: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          contract_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          notification_sent?: boolean | null
+          priority?: string
+          status?: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          contract_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          notification_sent?: boolean | null
+          priority?: string
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deadlines_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_uploads: {
+        Row: {
+          ai_analysis: Json | null
+          contract_id: string | null
+          created_at: string
+          extracted_text: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          processing_status: string
+          updated_at: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          contract_id?: string | null
+          created_at?: string
+          extracted_text?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          processing_status?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          contract_id?: string | null
+          created_at?: string
+          extracted_text?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          processing_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_uploads_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

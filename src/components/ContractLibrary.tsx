@@ -5,90 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, FileText, Calendar, DollarSign, AlertTriangle } from "lucide-react";
-
-interface Contract {
-  id: string;
-  title: string;
-  counterparty: string;
-  type: string;
-  status: 'active' | 'expired' | 'pending' | 'terminated';
-  effectiveDate: string;
-  renewalDate: string;
-  value: string;
-  riskLevel: 'low' | 'medium' | 'high';
-  tags: string[];
-}
-
-const mockContracts: Contract[] = [
-  {
-    id: '1',
-    title: 'Shipping Services Agreement',
-    counterparty: 'Global Maritime Ltd',
-    type: 'Service Agreement',
-    status: 'active',
-    effectiveDate: '2024-01-15',
-    renewalDate: '2024-12-31',
-    value: '$2,500,000',
-    riskLevel: 'low',
-    tags: ['shipping', 'logistics', 'international']
-  },
-  {
-    id: '2',
-    title: 'Equipment Lease Contract',
-    counterparty: 'TechEquip Solutions',
-    type: 'Lease Agreement',
-    status: 'active',
-    effectiveDate: '2023-06-01',
-    renewalDate: '2024-08-15',
-    value: '$450,000',
-    riskLevel: 'medium',
-    tags: ['equipment', 'technology', 'lease']
-  },
-  {
-    id: '3',
-    title: 'Supply Chain Partnership',
-    counterparty: 'ACME Manufacturing',
-    type: 'Partnership Agreement',
-    status: 'pending',
-    effectiveDate: '2024-03-01',
-    renewalDate: '2025-03-01',
-    value: '$1,200,000',
-    riskLevel: 'high',
-    tags: ['manufacturing', 'supply chain', 'procurement']
-  },
-  {
-    id: '4',
-    title: 'Software License Agreement',
-    counterparty: 'CloudTech Inc',
-    type: 'License Agreement',
-    status: 'active',
-    effectiveDate: '2023-09-01',
-    renewalDate: '2024-09-01',
-    value: '$75,000',
-    riskLevel: 'low',
-    tags: ['software', 'SaaS', 'technology']
-  }
-];
+import { Search, FileText, Calendar, DollarSign, AlertTriangle } from "lucide-react";
+import { useContracts } from "@/hooks/useContracts";
+import { format } from "date-fns";
 
 export const ContractLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [riskFilter, setRiskFilter] = useState("all");
-  const [contracts] = useState<Contract[]>(mockContracts);
+  const { data: contracts, isLoading, error } = useContracts();
 
-  const filteredContracts = contracts.filter(contract => {
+  const filteredContracts = contracts?.filter(contract => {
     const matchesSearch = contract.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          contract.counterparty.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contract.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+                         contract.contract_type.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
-    const matchesRisk = riskFilter === "all" || contract.riskLevel === riskFilter;
     
-    return matchesSearch && matchesStatus && matchesRisk;
+    return matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: Contract['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
         return 'bg-green-100 text-green-800 border-green-200';
@@ -98,23 +34,42 @@ export const ContractLibrary = () => {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'terminated':
         return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const getRiskColor = (risk: Contract['riskLevel']) => {
-    switch (risk) {
-      case 'low':
-        return 'text-green-600';
-      case 'medium':
-        return 'text-yellow-600';
-      case 'high':
-        return 'text-red-600';
-    }
+  const formatCurrency = (value: number | null) => {
+    if (!value) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(value);
   };
 
-  const getRiskIcon = (risk: Contract['riskLevel']) => {
-    return <AlertTriangle className={`w-4 h-4 ${getRiskColor(risk)}`} />;
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-12 text-center">
+            <div className="text-center py-8">Loading contracts...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-12 text-center">
+            <div className="text-center py-8 text-red-600">Error loading contracts</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -134,7 +89,7 @@ export const ContractLibrary = () => {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search contracts, counterparties, or tags..."
+                placeholder="Search contracts, counterparties, or types..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -152,24 +107,13 @@ export const ContractLibrary = () => {
                 <SelectItem value="terminated">Terminated</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={riskFilter} onValueChange={setRiskFilter}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue placeholder="Risk Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Risk</SelectItem>
-                <SelectItem value="low">Low Risk</SelectItem>
-                <SelectItem value="medium">Medium Risk</SelectItem>
-                <SelectItem value="high">High Risk</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
 
       {/* Contract List */}
       <div className="grid gap-4">
-        {filteredContracts.map((contract) => (
+        {filteredContracts?.map((contract) => (
           <Card key={contract.id} className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
@@ -182,18 +126,12 @@ export const ContractLibrary = () => {
                     <Badge variant="outline" className={getStatusColor(contract.status)}>
                       {contract.status}
                     </Badge>
-                    <Badge variant="outline">{contract.type}</Badge>
-                    <div className="flex items-center gap-1">
-                      {getRiskIcon(contract.riskLevel)}
-                      <span className={`text-sm font-medium ${getRiskColor(contract.riskLevel)}`}>
-                        {contract.riskLevel} risk
-                      </span>
-                    </div>
+                    <Badge variant="outline">{contract.contract_type}</Badge>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-slate-900 mb-1">
-                    {contract.value}
+                    {formatCurrency(contract.contract_value)}
                   </div>
                   <div className="text-sm text-slate-500">Contract Value</div>
                 </div>
@@ -204,32 +142,34 @@ export const ContractLibrary = () => {
                   <Calendar className="w-4 h-4 text-slate-400" />
                   <div>
                     <div className="text-sm font-medium text-slate-700">Effective Date</div>
-                    <div className="text-sm text-slate-600">{contract.effectiveDate}</div>
+                    <div className="text-sm text-slate-600">
+                      {contract.effective_date ? format(new Date(contract.effective_date), 'MMM d, yyyy') : 'N/A'}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-slate-400" />
                   <div>
-                    <div className="text-sm font-medium text-slate-700">Renewal Date</div>
-                    <div className="text-sm text-slate-600">{contract.renewalDate}</div>
+                    <div className="text-sm font-medium text-slate-700">Expiration Date</div>
+                    <div className="text-sm text-slate-600">
+                      {contract.expiration_date ? format(new Date(contract.expiration_date), 'MMM d, yyyy') : 'N/A'}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-slate-400" />
                   <div>
-                    <div className="text-sm font-medium text-slate-700">Total Value</div>
-                    <div className="text-sm text-slate-600">{contract.value}</div>
+                    <div className="text-sm font-medium text-slate-700">Currency</div>
+                    <div className="text-sm text-slate-600">{contract.currency || 'USD'}</div>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex gap-2">
-                  {contract.tags.map((tag, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
+                  <Badge variant="secondary" className="text-xs">
+                    {contract.renewal_notice_days || 30} day notice
+                  </Badge>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm">
@@ -245,7 +185,7 @@ export const ContractLibrary = () => {
         ))}
       </div>
 
-      {filteredContracts.length === 0 && (
+      {filteredContracts?.length === 0 && (
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-12 text-center">
             <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
