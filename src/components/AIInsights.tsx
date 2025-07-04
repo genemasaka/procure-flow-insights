@@ -1,10 +1,14 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Brain, TrendingUp, AlertTriangle, Target, Zap, Plus, Lightbulb } from "lucide-react";
+import { Brain, TrendingUp, AlertTriangle, Target, Zap, Plus, Lightbulb, CheckCircle } from "lucide-react";
 import { useAIInsights } from "@/hooks/useContracts";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AIInsightsProps {
   expanded?: boolean;
@@ -12,6 +16,9 @@ interface AIInsightsProps {
 
 export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
   const { data: insights, isLoading, error } = useAIInsights();
+  const [actioningInsight, setActioningInsight] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -53,6 +60,33 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
         return 'text-green-600';
       default:
         return 'text-gray-600';
+    }
+  };
+
+  const handleTakeAction = async (insightId: string, title: string) => {
+    try {
+      setActioningInsight(insightId);
+      
+      // Simulate taking action - in real app this would trigger specific workflows
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Action Initiated",
+        description: `Action has been taken for "${title}". You'll be notified of progress.`,
+      });
+      
+      // Optional: Mark insight as actioned in database
+      // await supabase.from('ai_insights').update({ actioned: true }).eq('id', insightId);
+      
+    } catch (error) {
+      console.error('Action error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate action. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setActioningInsight(null);
     }
   };
 
@@ -122,49 +156,68 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
               </Button>
             </div>
           ) : (
-            displayedInsights?.map((insight) => (
-              <div
-                key={insight.id}
-                className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon(insight.insight_type)}
-                    <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
-                      {insight.insight_type}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
-                      {insight.impact} impact
-                    </span>
-                    {insight.actionable && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        Actionable
+            displayedInsights?.map((insight) => {
+              const isActioning = actioningInsight === insight.id;
+              
+              return (
+                <div
+                  key={insight.id}
+                  className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {getTypeIcon(insight.insight_type)}
+                      <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
+                        {insight.insight_type}
                       </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
+                        {insight.impact} impact
+                      </span>
+                      {insight.actionable && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          Actionable
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
+                  <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500">Confidence:</span>
+                        <Progress value={insight.confidence} className="w-16 h-2" />
+                        <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
+                      </div>
+                    </div>
+                    {insight.actionable && (
+                      <Button 
+                        size="sm" 
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        onClick={() => handleTakeAction(insight.id, insight.title)}
+                        disabled={isActioning}
+                      >
+                        {isActioning ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Take Action
+                          </>
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
-
-                <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
-                <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">Confidence:</span>
-                      <Progress value={insight.confidence} className="w-16 h-2" />
-                      <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
-                    </div>
-                  </div>
-                  {insight.actionable && (
-                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                      Take Action
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

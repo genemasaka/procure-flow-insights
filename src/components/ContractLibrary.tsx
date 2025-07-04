@@ -5,13 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, Calendar, DollarSign, Plus, Upload } from "lucide-react";
+import { Search, FileText, Calendar, DollarSign, Plus, Upload, Eye, Edit } from "lucide-react";
 import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
 
 export const ContractLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedContract, setSelectedContract] = useState<string | null>(null);
   const { data: contracts, isLoading, error } = useContracts();
 
   const filteredContracts = contracts?.filter(contract => {
@@ -45,6 +46,17 @@ export const ContractLibrary = () => {
       style: 'currency',
       currency: 'USD'
     }).format(value);
+  };
+
+  const handleViewDetails = (contractId: string) => {
+    setSelectedContract(contractId);
+    // In a real app, this would navigate to a detailed view
+    console.log('Viewing contract details:', contractId);
+  };
+
+  const handleEditContract = (contractId: string) => {
+    // In a real app, this would open an edit form
+    console.log('Editing contract:', contractId);
   };
 
   if (isLoading) {
@@ -114,36 +126,32 @@ export const ContractLibrary = () => {
 
       {/* Contract List */}
       <div className="grid gap-4">
-        {!contracts || contracts.length === 0 ? (
+        {!filteredContracts || filteredContracts.length === 0 ? (
           <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-12 text-center">
-              <FileText className="w-16 h-16 text-slate-300 mx-auto mb-6" />
-              <h3 className="text-xl font-semibold text-slate-600 mb-2">No contracts yet</h3>
-              <p className="text-slate-500 mb-6">
-                Get started by uploading your first contract document or creating a new contract entry
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Contract
-                </Button>
-                <Button variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredContracts?.length === 0 ? (
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-12 text-center">
-              <Search className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-600 mb-2">No contracts found</h3>
-              <p className="text-slate-500">Try adjusting your search criteria or filters</p>
+              {!contracts || contracts.length === 0 ? (
+                <>
+                  <FileText className="w-16 h-16 text-slate-300 mx-auto mb-6" />
+                  <h3 className="text-xl font-semibold text-slate-600 mb-2">No contracts yet</h3>
+                  <p className="text-slate-500 mb-6">
+                    Get started by uploading your first contract document
+                  </p>
+                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Contract
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Search className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-600 mb-2">No contracts found</h3>
+                  <p className="text-slate-500">Try adjusting your search criteria or filters</p>
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (
-          filteredContracts?.map((contract) => (
+          filteredContracts.map((contract) => (
             <Card key={contract.id} className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -202,10 +210,20 @@ export const ContractLibrary = () => {
                     </Badge>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleViewDetails(contract.id)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </Button>
-                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Button 
+                      size="sm" 
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      onClick={() => handleEditContract(contract.id)}
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
                       Edit
                     </Button>
                   </div>

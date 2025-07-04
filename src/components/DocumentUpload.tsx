@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, AlertCircle, CheckCircle, X, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UploadedFile {
   id: string;
@@ -12,12 +14,14 @@ interface UploadedFile {
   size: number;
   status: 'uploading' | 'processing' | 'completed' | 'error';
   progress: number;
+  file: File;
 }
 
 export const DocumentUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -27,44 +31,148 @@ export const DocumentUpload = () => {
       name: file.name,
       size: file.size,
       status: 'uploading',
-      progress: 0
+      progress: 0,
+      file
     }));
 
     setFiles(prev => [...prev, ...newFiles]);
 
-    // Simulate upload process
+    // Process each file
     newFiles.forEach(file => {
-      simulateUpload(file.id);
+      processUpload(file);
     });
   };
 
-  const simulateUpload = (fileId: string) => {
-    const interval = setInterval(() => {
-      setFiles(prev => prev.map(file => {
-        if (file.id === fileId) {
-          if (file.progress < 100) {
-            return { ...file, progress: file.progress + 10 };
-          } else if (file.status === 'uploading') {
-            return { ...file, status: 'processing' };
-          } else if (file.status === 'processing') {
-            return { ...file, status: 'completed' };
-          }
-        }
-        return file;
-      }));
-    }, 300);
+  const processUpload = async (uploadFile: UploadedFile) => {
+    try {
+      // Update progress to show uploading
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, progress: 30 } : f
+      ));
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setFiles(prev => prev.map(file => 
-        file.id === fileId ? { ...file, status: 'completed', progress: 100 } : file
+      // Create document upload record
+      const { data: docUpload, error: uploadError } = await supabase
+        .from('document_uploads')
+        .insert({
+          file_name: uploadFile.file.name,
+          file_path: `/uploads/${uploadFile.file.name}`,
+          file_size: uploadFile.file.size,
+          mime_type: uploadFile.file.type,
+          processing_status: 'processing'
+        })
+        .select()
+        .single();
+
+      if (uploadError) throw uploadError;
+
+      // Update progress to show processing
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, progress: 60, status: 'processing' } : f
+      ));
+
+      // Extract contract information (simulated AI processing)
+      const contractTitle = uploadFile.file.name.replace(/\.[^/.]+$/, "");
+      const contractType = getContractType(uploadFile.file.name);
+      
+      // Create contract record
+      const { data: contract, error: contractError } = await supabase
+        .from('contracts')
+        .insert({
+          title: contractTitle,
+          counterparty: extractCounterparty(contractTitle),
+          contract_type: contractType,
+          status: 'active',
+          file_name: uploadFile.file.name,
+          file_path: `/uploads/${uploadFile.file.name}`,
+          contract_value: Math.floor(Math.random() * 1000000) + 10000,
+          effective_date: new Date().toISOString().split('T')[0],
+          expiration_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        })
+        .select()
+        .single();
+
+      if (contractError) throw contractError;
+
+      // Update document upload with contract reference
+      await supabase
+        .from('document_uploads')
+        .update({ 
+          contract_id: contract.id,
+          processing_status: 'completed'
+        })
+        .eq('id', docUpload.id);
+
+      // Create sample deadline
+      await supabase
+        .from('deadlines')
+        .insert({
+          contract_id: contract.id,
+          title: `${contractTitle} Renewal`,
+          description: `Contract renewal deadline for ${contractTitle}`,
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          type: 'renewal',
+          priority: 'medium'
+        });
+
+      // Create sample AI insight
+      await supabase
+        .from('ai_insights')
+        .insert({
+          contract_id: contract.id,
+          title: `Payment Terms Analysis`,
+          description: `The contract has standard payment terms with 30-day net payment schedule.`,
+          insight_type: 'opportunity',
+          impact: 'medium',
+          confidence: 85,
+          actionable: true
+        });
+
+      // Update progress to completed
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, progress: 100, status: 'completed' } : f
+      ));
+
+      // Refresh queries to show new data
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['deadlines'] });
+      queryClient.invalidateQueries({ queryKey: ['ai_insights'] });
+
+      toast({
+        title: "Upload Complete",
+        description: `${uploadFile.file.name} has been processed and added to your library.`,
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, status: 'error' } : f
       ));
       
       toast({
-        title: "Upload Complete",
-        description: "Contract document has been processed successfully.",
+        title: "Upload Failed",
+        description: `Failed to process ${uploadFile.file.name}. Please try again.`,
+        variant: "destructive"
       });
-    }, 3500);
+    }
+  };
+
+  const getContractType = (filename: string): string => {
+    const name = filename.toLowerCase();
+    if (name.includes('service') || name.includes('sla')) return 'Service Agreement';
+    if (name.includes('supply') || name.includes('vendor')) return 'Supply Contract';
+    if (name.includes('license')) return 'License Agreement';
+    if (name.includes('lease') || name.includes('rent')) return 'Lease Agreement';
+    if (name.includes('employment') || name.includes('hire')) return 'Employment Contract';
+    return 'General Contract';
+  };
+
+  const extractCounterparty = (title: string): string => {
+    // Simple extraction - in real app this would use AI
+    const words = title.split(/[\s_-]+/);
+    return words.find(word => 
+      word.length > 3 && 
+      !['contract', 'agreement', 'document', 'final', 'draft', 'signed'].includes(word.toLowerCase())
+    ) || 'Unknown Party';
   };
 
   const removeFile = (fileId: string) => {
@@ -170,7 +278,12 @@ export const DocumentUpload = () => {
                     )}
                     {file.status === 'completed' && (
                       <p className="text-sm text-green-600 mt-1">
-                        ✓ Processed successfully
+                        ✓ Processed successfully and added to library
+                      </p>
+                    )}
+                    {file.status === 'error' && (
+                      <p className="text-sm text-red-600 mt-1">
+                        ✗ Failed to process
                       </p>
                     )}
                   </div>

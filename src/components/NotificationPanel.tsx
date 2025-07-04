@@ -13,13 +13,18 @@ import {
 import { Bell, Calendar, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { useDeadlines } from "@/hooks/useContracts";
 import { differenceInDays, format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export const NotificationPanel = () => {
   const { data: deadlines } = useDeadlines();
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
-  // Create notifications from deadlines
-  const notifications = deadlines?.map(deadline => {
+  // Create notifications from deadlines (only show pending deadlines within 30 days)
+  const notifications = deadlines?.filter(deadline => {
+    const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
+    return deadline.status === 'pending' && daysRemaining <= 30;
+  })?.map(deadline => {
     const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
     let type: 'deadline' | 'renewal' | 'risk' | 'milestone' = 'deadline';
     
@@ -34,9 +39,10 @@ export const NotificationPanel = () => {
       message: deadline.description || `${deadline.title} due in ${daysRemaining} days`,
       time: daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} days`,
       read: readNotifications.has(deadline.id),
-      daysRemaining
+      daysRemaining,
+      contractId: deadline.contract_id
     };
-  }).filter(n => n.daysRemaining <= 30) || []; // Only show notifications for next 30 days
+  }) || [];
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -46,6 +52,22 @@ export const NotificationPanel = () => {
 
   const markAllAsRead = () => {
     setReadNotifications(new Set(notifications.map(n => n.id)));
+  };
+
+  const handleNotificationClick = (notification: any) => {
+    markAsRead(notification.id);
+    
+    // Show a toast with more details
+    toast({
+      title: notification.title,
+      description: `${notification.message} - Click to view contract details.`,
+    });
+    
+    // In a real app, this would navigate to the specific contract or deadline
+    console.log('Navigating to:', {
+      deadlineId: notification.id,
+      contractId: notification.contractId
+    });
   };
 
   const getIcon = (type: string) => {
@@ -78,7 +100,7 @@ export const NotificationPanel = () => {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 bg-white shadow-lg border-0">
+      <DropdownMenuContent align="end" className="w-80 bg-white shadow-lg border-0 z-50">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
           {unreadCount > 0 && (
@@ -103,7 +125,7 @@ export const NotificationPanel = () => {
                 className={`p-4 cursor-pointer hover:bg-slate-50 ${
                   !notification.read ? 'bg-blue-50/50' : ''
                 }`}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-start gap-3 w-full">
                   {getIcon(notification.type)}

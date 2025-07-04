@@ -1,10 +1,14 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, AlertTriangle, CheckCircle, Bell, Plus } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, CheckCircle, Bell, Plus, Snooze } from "lucide-react";
 import { useDeadlines } from "@/hooks/useContracts";
 import { format, differenceInDays } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DeadlineTimelineProps {
   expanded?: boolean;
@@ -12,6 +16,9 @@ interface DeadlineTimelineProps {
 
 export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) => {
   const { data: deadlines, isLoading, error } = useDeadlines();
+  const [actioningDeadline, setActioningDeadline] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -60,6 +67,75 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
     return 'text-green-600';
   };
 
+  const handleSnooze = async (deadlineId: string) => {
+    try {
+      setActioningDeadline(deadlineId);
+      
+      // Snooze for 7 days
+      const newDate = new Date();
+      newDate.setDate(newDate.getDate() + 7);
+      
+      const { error } = await supabase
+        .from('deadlines')
+        .update({ 
+          due_date: newDate.toISOString().split('T')[0],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', deadlineId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['deadlines'] });
+      
+      toast({
+        title: "Deadline Snoozed",
+        description: "Deadline has been postponed by 7 days.",
+      });
+    } catch (error) {
+      console.error('Snooze error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to snooze deadline. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setActioningDeadline(null);
+    }
+  };
+
+  const handleAction = async (deadlineId: string, title: string) => {
+    try {
+      setActioningDeadline(deadlineId);
+      
+      // Mark as completed
+      const { error } = await supabase
+        .from('deadlines')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', deadlineId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['deadlines'] });
+      
+      toast({
+        title: "Action Completed",
+        description: `"${title}" has been marked as completed.`,
+      });
+    } catch (error) {
+      console.error('Action error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete action. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setActioningDeadline(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -98,7 +174,9 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
     );
   }
 
-  const displayedDeadlines = expanded ? deadlines : deadlines?.slice(0, 4);
+  // Only show pending deadlines
+  const pendingDeadlines = deadlines?.filter(deadline => deadline.status === 'pending') || [];
+  const displayedDeadlines = expanded ? pendingDeadlines : pendingDeadlines.slice(0, 4);
 
   return (
     <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -113,12 +191,12 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {!deadlines || deadlines.length === 0 ? (
+          {displayedDeadlines.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-600 mb-2">No deadlines yet</h3>
+              <h3 className="text-lg font-medium text-slate-600 mb-2">No pending deadlines</h3>
               <p className="text-slate-500 mb-4">
-                Start adding contracts to track important dates and obligations
+                All deadlines are up to date. Upload contracts to track important dates.
               </p>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                 <Plus className="w-4 h-4 mr-2" />
@@ -126,8 +204,9 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
               </Button>
             </div>
           ) : (
-            displayedDeadlines?.map((deadline) => {
+            displayedDeadlines.map((deadline) => {
               const daysRemaining = differenceInDays(new Date(deadline.due_date), new Date());
+              const isActioning = actioningDeadline === deadline.id;
               
               return (
                 <div
@@ -144,7 +223,7 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
                         {deadline.priority}
                       </Badge>
                       <span className={`text-sm font-medium ${getUrgencyColor(daysRemaining)}`}>
-                        {daysRemaining} days
+                        {daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} days`}
                       </span>
                     </div>
                   </div>
@@ -167,11 +246,22 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleSnooze(deadline.id)}
+                        disabled={isActioning}
+                      >
+                        <Snooze className="w-4 h-4 mr-1" />
                         Snooze
                       </Button>
-                      <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                        Action
+                      <Button 
+                        size="sm" 
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        onClick={() => handleAction(deadline.id, deadline.title)}
+                        disabled={isActioning}
+                      >
+                        {isActioning ? 'Processing...' : 'Complete'}
                       </Button>
                     </div>
                   </div>
@@ -181,10 +271,10 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
           )}
         </div>
 
-        {!expanded && deadlines && deadlines.length > 4 && (
+        {!expanded && pendingDeadlines.length > 4 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
             <Button variant="outline" className="w-full">
-              View All Deadlines ({deadlines.length - 4} more)
+              View All Deadlines ({pendingDeadlines.length - 4} more)
             </Button>
           </div>
         )}
