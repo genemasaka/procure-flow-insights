@@ -8,6 +8,7 @@ import { format, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 
 interface DeadlineTimelineProps {
   expanded?: boolean;
@@ -18,6 +19,7 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
   const [actioningDeadline, setActioningDeadline] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const location = useLocation();
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -136,11 +138,16 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
   };
 
   const handleAddContract = () => {
-    // Switch to upload tab
-    const tabsElement = document.querySelector('[data-state="active"]')?.closest('[role="tablist"]');
-    if (tabsElement) {
-      const uploadTab = tabsElement.querySelector('[value="upload"]') as HTMLButtonElement;
-      uploadTab?.click();
+    // Check if we're on the main dashboard page
+    if (location.pathname === '/') {
+      // Find and click the upload tab
+      const uploadTab = document.querySelector('[value="upload"]') as HTMLButtonElement;
+      if (uploadTab) {
+        uploadTab.click();
+      }
+    } else {
+      // Navigate to the dashboard and then switch to upload tab
+      window.location.href = '/#upload';
     }
   };
 
