@@ -135,6 +135,15 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
     }
   };
 
+  const handleAddContract = () => {
+    // Switch to upload tab
+    const tabsElement = document.querySelector('[data-state="active"]')?.closest('[role="tablist"]');
+    if (tabsElement) {
+      const uploadTab = tabsElement.querySelector('[value="upload"]') as HTMLButtonElement;
+      uploadTab?.click();
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -197,7 +206,10 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
               <p className="text-slate-500 mb-4">
                 All deadlines are up to date. Upload contracts to track important dates.
               </p>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <Button 
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                onClick={handleAddContract}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Contract
               </Button>
@@ -272,7 +284,11 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
 
         {!expanded && pendingDeadlines.length > 4 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => window.location.href = '/deadlines'}
+            >
               View All Deadlines ({pendingDeadlines.length - 4} more)
             </Button>
           </div>

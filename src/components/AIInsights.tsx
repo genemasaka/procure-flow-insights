@@ -67,22 +67,26 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
     try {
       setActioningInsight(insightId);
       
-      // Simulate taking action - in real app this would trigger specific workflows
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Mark insight as actioned in database
+      const { error } = await supabase
+        .from('ai_insights')
+        .update({ actionable: false })
+        .eq('id', insightId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['ai_insights'] });
       
       toast({
-        title: "Action Initiated",
-        description: `Action has been taken for "${title}". You'll be notified of progress.`,
+        title: "Action Completed",
+        description: `Action has been taken for "${title}".`,
       });
-      
-      // Optional: Mark insight as actioned in database
-      // await supabase.from('ai_insights').update({ actioned: true }).eq('id', insightId);
       
     } catch (error) {
       console.error('Action error:', error);
       toast({
         title: "Error",
-        description: "Failed to initiate action. Please try again.",
+        description: "Failed to complete action. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -150,10 +154,6 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
               <p className="text-slate-500 mb-4">
                 Upload contracts to get AI-powered insights about risks, opportunities, and trends
               </p>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Upload Contract
-              </Button>
             </div>
           ) : (
             displayedInsights?.map((insight) => {
@@ -223,7 +223,11 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
 
         {!expanded && insights && insights.length > 3 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => window.location.href = '/insights'}
+            >
               View All Insights ({insights.length - 3} more)
             </Button>
           </div>

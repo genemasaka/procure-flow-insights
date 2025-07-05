@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, Calendar, DollarSign, Plus, Upload, Eye, Edit } from "lucide-react";
+import { Search, FileText, Calendar, DollarSign, Upload, Eye, Edit } from "lucide-react";
 import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
 
@@ -49,14 +48,21 @@ export const ContractLibrary = () => {
   };
 
   const handleViewDetails = (contractId: string) => {
-    setSelectedContract(contractId);
-    // In a real app, this would navigate to a detailed view
-    console.log('Viewing contract details:', contractId);
+    window.location.href = `/contracts/${contractId}`;
   };
 
   const handleEditContract = (contractId: string) => {
-    // In a real app, this would open an edit form
-    console.log('Editing contract:', contractId);
+    // For now, redirect to details page with edit mode
+    window.location.href = `/contracts/${contractId}`;
+  };
+
+  const handleAddContract = () => {
+    // Switch to upload tab
+    const tabsElement = document.querySelector('[data-state="active"]')?.closest('[role="tablist"]');
+    if (tabsElement) {
+      const uploadTab = tabsElement.querySelector('[value="upload"]') as HTMLButtonElement;
+      uploadTab?.click();
+    }
   };
 
   if (isLoading) {
@@ -136,7 +142,10 @@ export const ContractLibrary = () => {
                   <p className="text-slate-500 mb-6">
                     Get started by uploading your first contract document
                   </p>
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Button 
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    onClick={handleAddContract}
+                  >
                     <Upload className="w-4 h-4 mr-2" />
                     Upload Contract
                   </Button>
