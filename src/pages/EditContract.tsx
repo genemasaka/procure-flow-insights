@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,16 +73,23 @@ const EditContract = () => {
 
   const fetchContractDetails = async () => {
     try {
+      console.log('Fetching contract details for ID:', id);
       const { data, error } = await supabase
         .from('contracts')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       
+      console.log('Contract data retrieved:', data);
       setContract(data);
-      setFormData({
+      
+      // Update form data with retrieved contract information
+      const updatedFormData = {
         title: data.title || '',
         counterparty: data.counterparty || '',
         contract_type: data.contract_type || '',
@@ -95,7 +101,10 @@ const EditContract = () => {
         renewal_notice_days: data.renewal_notice_days?.toString() || '30',
         file_name: data.file_name || '',
         contract_content: data.contract_content || ''
-      });
+      };
+      
+      console.log('Setting form data:', updatedFormData);
+      setFormData(updatedFormData);
     } catch (error) {
       console.error('Error fetching contract details:', error);
       toast({
@@ -109,6 +118,7 @@ const EditContract = () => {
   };
 
   const handleInputChange = (field: string, value: string) => {
+    console.log(`Updating field ${field} with value:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -356,9 +366,12 @@ const EditContract = () => {
                   id="contract_content"
                   value={formData.contract_content}
                   onChange={(e) => handleInputChange('contract_content', e.target.value)}
-                  placeholder="Enter the complete contract text here..."
+                  placeholder={formData.contract_content ? "" : "Enter the complete contract text here..."}
                   className="min-h-[300px] resize-vertical font-mono text-sm"
                 />
+                <p className="text-xs text-slate-500">
+                  {formData.contract_content ? `${formData.contract_content.length} characters` : 'No content loaded'}
+                </p>
               </div>
             </CardContent>
           </Card>
