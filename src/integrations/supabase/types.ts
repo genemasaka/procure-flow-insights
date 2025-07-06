@@ -55,6 +55,7 @@ export type Database = {
       }
       contracts: {
         Row: {
+          contract_content: string | null
           contract_type: string
           contract_value: number | null
           counterparty: string
@@ -72,6 +73,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          contract_content?: string | null
           contract_type: string
           contract_value?: number | null
           counterparty: string
@@ -89,6 +91,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          contract_content?: string | null
           contract_type?: string
           contract_value?: number | null
           counterparty?: string

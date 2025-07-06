@@ -1,109 +1,123 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { message, userId } = await req.json();
-    
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error('Gemini API key not configured');
-    }
+    const { message, userId } = await req.json()
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Gather context from user's data
-    const [contractsResult, insightsResult, deadlinesResult] = await Promise.all([
-      supabase.from('contracts').select('*').limit(20),
-      supabase.from('ai_insights').select('*, contracts(title, counterparty)').limit(10),
-      supabase.from('deadlines').select('*, contracts(title, counterparty)').limit(10)
-    ]);
+    // Get context from contracts and related data
+    const { data: contracts } = await supabase
+      .from('contracts')
+      .select(`
+        *,
+        deadlines(*),
+        ai_insights(*)
+      `)
+      .limit(5)
 
-    const contracts = contractsResult.data || [];
-    const insights = insightsResult.data || [];
-    const deadlines = deadlinesResult.data || [];
+    // Get Gemini API key
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY not found in environment variables')
+    }
 
-    // Build context for the AI
-    const contractContext = contracts.map(c => 
-      `Contract: ${c.title} with ${c.counterparty}, Type: ${c.contract_type}, Status: ${c.status}, Value: ${c.contract_value} ${c.currency || 'USD'}`
-    ).join('\n');
+    // Prepare context with contract content
+    let contextInfo = "Here's information about the current contracts:\n\n"
+    
+    if (contracts && contracts.length > 0) {
+      contracts.forEach((contract, index) => {
+        contextInfo += `Contract ${index + 1}:\n`
+        contextInfo += `- Title: ${contract.title}\n`
+        contextInfo += `- Counterparty: ${contract.counterparty}\n`
+        contextInfo += `- Type: ${contract.contract_type}\n`
+        contextInfo += `- Status: ${contract.status}\n`
+        contextInfo += `- Value: ${contract.contract_value} ${contract.currency}\n`
+        contextInfo += `- Effective Date: ${contract.effective_date || 'N/A'}\n`
+        contextInfo += `- Expiration Date: ${contract.expiration_date || 'N/A'}\n`
+        
+        if (contract.contract_content) {
+          contextInfo += `- Contract Content: ${contract.contract_content.substring(0, 500)}${contract.contract_content.length > 500 ? '...' : ''}\n`
+        }
+        
+        if (contract.deadlines && contract.deadlines.length > 0) {
+          contextInfo += `- Upcoming Deadlines: ${contract.deadlines.map(d => `${d.title} (${d.due_date})`).join(', ')}\n`
+        }
+        
+        if (contract.ai_insights && contract.ai_insights.length > 0) {
+          contextInfo += `- AI Insights: ${contract.ai_insights.map(i => `${i.title} (${i.impact} impact)`).join(', ')}\n`
+        }
+        
+        contextInfo += '\n'
+      })
+    } else {
+      contextInfo += "No contracts available in the system yet.\n\n"
+    }
 
-    const insightContext = insights.map(i => 
-      `Insight: ${i.title} - ${i.description} (Impact: ${i.impact}, Confidence: ${i.confidence}%)`
-    ).join('\n');
-
-    const deadlineContext = deadlines.map(d => 
-      `Deadline: ${d.title} - ${d.description || ''} Due: ${d.due_date} Priority: ${d.priority} Status: ${d.status}`
-    ).join('\n');
-
-    const systemPrompt = `You are an AI assistant for ProcureFlow, a contract management system. Help users with questions about their contracts, insights, and deadlines.
-
-Current user's data context:
-CONTRACTS:
-${contractContext}
-
-AI INSIGHTS:
-${insightContext}
-
-DEADLINES:
-${deadlineContext}
-
-Provide helpful, accurate responses based on this context. If asked about specific contracts or data not in the context, let the user know you can only see their current data shown above.`;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+    // Call Gemini API
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `${systemPrompt}\n\nUser message: ${message}`
-              }
-            ]
-          }
-        ],
+        contents: [{
+          parts: [{
+            text: `You are a contract management AI assistant. You help users manage their contracts, analyze risks, track deadlines, and provide insights.
+
+${contextInfo}
+
+User message: ${message}
+
+Please provide a helpful response based on the contract information available. If the user asks about specific contracts, reference the contract content when available. Focus on being practical and actionable in your advice.`
+          }]
+        }],
         generationConfig: {
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 500,
-        }
+          maxOutputTokens: 1024,
+        },
       }),
-    });
+    })
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'Gemini API error');
+    if (!geminiResponse.ok) {
+      throw new Error(`Gemini API error: ${geminiResponse.status}`)
     }
 
-    const aiResponse = data.candidates[0].content.parts[0].text;
+    const geminiData = await geminiResponse.json()
+    const aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "I apologize, but I couldn't generate a response at this time."
 
-    return new Response(JSON.stringify({ response: aiResponse }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ response: aiResponse }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+
   } catch (error) {
-    console.error('Error in ai-chat function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Error in ai-chat function:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
   }
-});
+})

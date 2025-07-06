@@ -21,6 +21,7 @@ interface Contract {
   expiration_date: string | null;
   file_name: string | null;
   renewal_notice_days: number | null;
+  contract_content: string | null;
   created_at: string;
 }
 
@@ -203,6 +204,26 @@ const ContractDetails = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Contract Content */}
+          {contract.contract_content && (
+            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Contract Content
+                </CardTitle>
+                <CardDescription>Full contract text and clauses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-slate-50 p-4 rounded-lg border">
+                  <pre className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
+                    {contract.contract_content}
+                  </pre>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Additional Information */}
           <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">

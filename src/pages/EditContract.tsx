@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { ArrowLeft, Save, Trash2, Sparkles, AlertTriangle, Calendar, DollarSign } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Sparkles, AlertTriangle, Calendar, DollarSign, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -36,6 +36,7 @@ interface Contract {
   expiration_date: string | null;
   file_name: string | null;
   renewal_notice_days: number | null;
+  contract_content: string | null;
   created_at: string;
 }
 
@@ -61,7 +62,8 @@ const EditContract = () => {
     effective_date: '',
     expiration_date: '',
     renewal_notice_days: '',
-    file_name: ''
+    file_name: '',
+    contract_content: ''
   });
 
   useEffect(() => {
@@ -91,7 +93,8 @@ const EditContract = () => {
         effective_date: data.effective_date || '',
         expiration_date: data.expiration_date || '',
         renewal_notice_days: data.renewal_notice_days?.toString() || '30',
-        file_name: data.file_name || ''
+        file_name: data.file_name || '',
+        contract_content: data.contract_content || ''
       });
     } catch (error) {
       console.error('Error fetching contract details:', error);
@@ -123,6 +126,7 @@ const EditContract = () => {
         expiration_date: formData.expiration_date || null,
         renewal_notice_days: formData.renewal_notice_days ? parseInt(formData.renewal_notice_days) : 30,
         file_name: formData.file_name || null,
+        contract_content: formData.contract_content || null,
         updated_at: new Date().toISOString()
       };
 
@@ -188,9 +192,18 @@ const EditContract = () => {
   const generateAiSuggestions = async () => {
     setGeneratingAi(true);
     try {
+      const contractInfo = `
+        Contract: ${formData.title}
+        Counterparty: ${formData.counterparty}
+        Type: ${formData.contract_type}
+        Value: ${formData.contract_value} ${formData.currency}
+        Status: ${formData.status}
+        Contract Content: ${formData.contract_content || 'No content provided'}
+      `;
+
       const response = await supabase.functions.invoke('ai-chat', {
         body: {
-          message: `Please provide suggestions for improving this contract: ${formData.title} with ${formData.counterparty}. Contract type: ${formData.contract_type}. Current value: ${formData.contract_value} ${formData.currency}. Status: ${formData.status}. Provide specific recommendations for clauses, terms, or improvements.`,
+          message: `Please analyze this contract and provide specific suggestions for improving clauses, terms, or identifying potential risks. Focus on actionable recommendations: ${contractInfo}`,
           userId: 'contract-editor'
         }
       });
@@ -327,6 +340,29 @@ const EditContract = () => {
             </CardContent>
           </Card>
 
+          {/* Contract Content */}
+          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Contract Content
+              </CardTitle>
+              <CardDescription>Enter or edit the full contract text</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="contract_content">Full Contract Text</Label>
+                <Textarea
+                  id="contract_content"
+                  value={formData.contract_content}
+                  onChange={(e) => handleInputChange('contract_content', e.target.value)}
+                  placeholder="Enter the complete contract text here..."
+                  className="min-h-[300px] resize-vertical font-mono text-sm"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Financial Details */}
           <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
             <CardHeader>
@@ -425,7 +461,7 @@ const EditContract = () => {
                 <Sparkles className="w-5 h-5" />
                 AI Contract Assistant
               </CardTitle>
-              <CardDescription>Get AI-powered suggestions for improving your contract</CardDescription>
+              <CardDescription>Get AI-powered suggestions for improving your contract clauses and terms</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -437,24 +473,25 @@ const EditContract = () => {
                   {generatingAi ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Generating Suggestions...
+                      Analyzing Contract...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Generate AI Suggestions
+                      Analyze Contract & Get AI Suggestions
                     </>
                   )}
                 </Button>
                 
                 {aiSuggestions && (
                   <div className="space-y-2">
-                    <Label>AI Suggestions</Label>
+                    <Label>AI Analysis & Suggestions</Label>
                     <Textarea
                       value={aiSuggestions}
                       onChange={(e) => setAiSuggestions(e.target.value)}
                       placeholder="AI suggestions will appear here..."
                       className="min-h-[120px] resize-vertical"
+                      readOnly
                     />
                   </div>
                 )}
