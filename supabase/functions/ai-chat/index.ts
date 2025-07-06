@@ -50,9 +50,14 @@ serve(async (req) => {
         contextInfo += `- Value: ${contract.contract_value} ${contract.currency}\n`
         contextInfo += `- Effective Date: ${contract.effective_date || 'N/A'}\n`
         contextInfo += `- Expiration Date: ${contract.expiration_date || 'N/A'}\n`
+        contextInfo += `- Renewal Notice: ${contract.renewal_notice_days || 30} days\n`
         
         if (contract.contract_content) {
-          contextInfo += `- Contract Content: ${contract.contract_content.substring(0, 500)}${contract.contract_content.length > 500 ? '...' : ''}\n`
+          // Include more contract content for better AI analysis
+          const contentPreview = contract.contract_content.length > 1000 
+            ? contract.contract_content.substring(0, 1000) + '...' 
+            : contract.contract_content
+          contextInfo += `- Contract Content: ${contentPreview}\n`
         }
         
         if (contract.deadlines && contract.deadlines.length > 0) {
@@ -69,6 +74,40 @@ serve(async (req) => {
       contextInfo += "No contracts available in the system yet.\n\n"
     }
 
+    // Determine if this is a contract analysis request
+    const isContractAnalysis = message.toLowerCase().includes('analyze') || 
+                              message.toLowerCase().includes('extract') ||
+                              message.toLowerCase().includes('contract') ||
+                              userId === 'document-processor'
+
+    let systemPrompt = `You are a contract management AI assistant. You help users manage their contracts, analyze risks, track deadlines, and provide insights.
+
+${contextInfo}
+
+User message: ${message}`
+
+    // Special handling for contract document processing
+    if (userId === 'document-processor') {
+      systemPrompt = `You are an expert contract analysis AI. Your task is to extract key contract information from the provided document content.
+
+Please analyze the following contract document and extract the required information. Focus on identifying:
+
+1. Contract Title: The main title or heading of the contract
+2. Counterparty: The other party/parties involved (companies, individuals)
+3. Contract Type: Classify as one of the predefined types
+4. Status: Determine if active, pending, expired, or terminated
+5. Contract Content: The full text content
+6. Contract Value: Any monetary amounts mentioned
+7. Currency: Including Kenyan Shilling (KES) if mentioned
+8. Effective Date: When the contract starts
+9. Expiration Date: When the contract ends
+10. Renewal Notice: Number of days notice required
+
+${message}
+
+Please provide accurate extraction based on the actual document content. If information is not clearly available, indicate this appropriately.`
+    }
+
     // Call Gemini API
     const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
@@ -78,20 +117,14 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are a contract management AI assistant. You help users manage their contracts, analyze risks, track deadlines, and provide insights.
-
-${contextInfo}
-
-User message: ${message}
-
-Please provide a helpful response based on the contract information available. If the user asks about specific contracts, reference the contract content when available. Focus on being practical and actionable in your advice.`
+            text: systemPrompt
           }]
         }],
         generationConfig: {
-          temperature: 0.7,
+          temperature: isContractAnalysis ? 0.3 : 0.7, // Lower temperature for contract analysis
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 1024,
+          maxOutputTokens: isContractAnalysis ? 2048 : 1024, // More tokens for contract analysis
         },
       }),
     })
