@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import AllInsights from "./pages/AllInsights";
 import AllDeadlines from "./pages/AllDeadlines";
 import ContractDetails from "./pages/ContractDetails";
+import EditContract from "./pages/EditContract";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/insights" element={<AllInsights />} />
             <Route path="/deadlines" element={<AllDeadlines />} />
             <Route path="/contracts/:id" element={<ContractDetails />} />
+            <Route path="/contracts/:id/edit" element={<EditContract />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <AIChatWindow />
