@@ -8,11 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings as SettingsIcon, User, Bell, Mail } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Mail, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Settings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -71,6 +73,14 @@ const Settings = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="mb-8">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+            className="mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Settings</h1>
           <p className="text-slate-600">Manage your account settings and preferences</p>
         </div>
