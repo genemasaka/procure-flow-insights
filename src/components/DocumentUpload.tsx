@@ -50,6 +50,8 @@ export const DocumentUpload = () => {
       const fileName = `${contractId}_${Date.now()}.${fileExt}`;
       const filePath = `contracts/${fileName}`;
 
+      console.log('Uploading file to storage:', filePath);
+
       const { data, error } = await supabase.storage
         .from('contract-documents')
         .upload(filePath, file, {
@@ -62,6 +64,7 @@ export const DocumentUpload = () => {
         return null;
       }
 
+      console.log('File uploaded successfully to storage:', data.path);
       return data.path;
     } catch (error) {
       console.error('File upload error:', error);
@@ -70,39 +73,53 @@ export const DocumentUpload = () => {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
+    console.log('Extracting text from file:', file.name, 'Type:', file.type);
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      
       reader.onload = () => {
         try {
+          console.log('FileReader onload triggered for:', file.name);
+          
           if (file.type === 'application/pdf') {
             // For PDFs, we'll pass the base64 content to Gemini for analysis
             const base64Content = (reader.result as string).split(',')[1];
-            resolve(base64Content);
+            console.log('PDF content extracted, base64 length:', base64Content?.length || 0);
+            resolve(base64Content || '');
           } else if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
             // For text files, use the text content
-            resolve(reader.result as string);
+            const textContent = reader.result as string;
+            console.log('Text content extracted, length:', textContent?.length || 0);
+            resolve(textContent || '');
           } else if (file.type.startsWith('image/')) {
             // For images, we'll pass the base64 content to Gemini
             const base64Content = (reader.result as string).split(',')[1];
-            resolve(base64Content);
+            console.log('Image content extracted, base64 length:', base64Content?.length || 0);
+            resolve(base64Content || '');
           } else {
             // For other file types, try to read as text
-            resolve(reader.result as string || `Document content from ${file.name}`);
+            const content = reader.result as string || `Document content from ${file.name}`;
+            console.log('Other file type content extracted, length:', content.length);
+            resolve(content);
           }
         } catch (error) {
           console.error('Error processing file content:', error);
           resolve(`Document content from ${file.name}`);
         }
       };
+      
       reader.onerror = () => {
-        console.error('FileReader error');
+        console.error('FileReader error for:', file.name);
         resolve(`Document content from ${file.name}`);
       };
 
       // Read file based on type
       if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+        console.log('Reading file as data URL for:', file.name);
         reader.readAsDataURL(file);
       } else {
+        console.log('Reading file as text for:', file.name);
         reader.readAsText(file);
       }
     });
@@ -110,7 +127,9 @@ export const DocumentUpload = () => {
 
   const processWithAI = async (fileName: string, fileContent: string, file: File) => {
     try {
-      console.log('Processing file with AI:', fileName);
+      console.log('Starting AI processing for file:', fileName);
+      console.log('File type:', file.type);
+      console.log('Content length:', fileContent?.length || 0);
       
       // Prepare the message for Gemini based on file type
       let analysisMessage = '';
@@ -180,6 +199,8 @@ export const DocumentUpload = () => {
         }`;
       }
 
+      console.log('Sending message to AI function:', analysisMessage.substring(0, 200) + '...');
+
       const response = await supabase.functions.invoke('ai-chat', {
         body: {
           message: analysisMessage,
@@ -187,29 +208,48 @@ export const DocumentUpload = () => {
         }
       });
 
+      console.log('AI function response received:', response);
+      console.log('Response data:', response.data);
+      console.log('Response error:', response.error);
+
+      if (response.error) {
+        console.error('AI function invocation error:', response.error);
+        throw new Error(`AI processing failed: ${response.error.message}`);
+      }
+
       if (response.data?.response) {
+        console.log('Full AI response:', response.data.response);
+        
         try {
           // Try to extract JSON from the AI response
           const jsonMatch = response.data.response.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const extractedData = JSON.parse(jsonMatch[0]);
-            console.log('AI extracted data:', extractedData);
+            console.log('Successfully parsed AI extracted data:', extractedData);
             
             // Validate required fields and identify missing ones
             const requiredFields = ['contract_name', 'parties_involved', 'contract_type', 'contract_value', 'effective_date', 'expiration_date'];
             const missingFields = requiredFields.filter(field => !extractedData[field] || extractedData[field] === null);
             
+            console.log('Missing fields identified:', missingFields);
+            
             return {
               data: extractedData,
               missingFields: missingFields
             };
+          } else {
+            console.warn('No JSON found in AI response, using fallback');
           }
         } catch (parseError) {
-          console.error('Error parsing AI response:', parseError);
+          console.error('Error parsing AI response as JSON:', parseError);
+          console.log('Raw response that failed to parse:', response.data.response);
         }
+      } else {
+        console.warn('No response data from AI function');
       }
 
       // Fallback extraction if AI fails
+      console.log('Using fallback extraction method');
       return {
         data: extractContractInfoFallback(fileName, fileContent),
         missingFields: []
@@ -224,6 +264,8 @@ export const DocumentUpload = () => {
   };
 
   const extractContractInfoFallback = (fileName: string, extractedText: string) => {
+    console.log('Using fallback extraction for:', fileName);
+    
     // Fallback extraction logic
     const contractName = fileName.replace(/\.[^/.]+$/, "");
     const contractType = getContractType(fileName);
@@ -244,6 +286,8 @@ export const DocumentUpload = () => {
 
   const processUpload = async (uploadFile: UploadedFile) => {
     try {
+      console.log('Starting upload process for:', uploadFile.file.name);
+      
       // Update progress to show uploading
       setFiles(prev => prev.map(f => 
         f.id === uploadFile.id ? { ...f, progress: 10 } : f
@@ -251,6 +295,7 @@ export const DocumentUpload = () => {
 
       // Extract content from file
       const extractedContent = await extractTextFromFile(uploadFile.file);
+      console.log('Content extracted successfully, length:', extractedContent?.length || 0);
       
       // Update progress to show AI processing
       setFiles(prev => prev.map(f => 
@@ -267,6 +312,9 @@ export const DocumentUpload = () => {
       const aiResult = await processWithAI(uploadFile.file.name, extractedContent, uploadFile.file);
       const aiExtractedData = aiResult.data;
       const missingFields = aiResult.missingFields;
+      
+      console.log('AI processing completed. Data:', aiExtractedData);
+      console.log('Missing fields:', missingFields);
       
       // Update progress to show database insertion
       setFiles(prev => prev.map(f => 
@@ -302,6 +350,8 @@ export const DocumentUpload = () => {
         console.error('Contract creation error:', contractError);
         throw contractError;
       }
+
+      console.log('Contract created successfully:', contract);
 
       // Update progress to show file storage
       setFiles(prev => prev.map(f => 
@@ -497,9 +547,13 @@ export const DocumentUpload = () => {
   };
 
   const handleButtonClick = () => {
+    console.log('Upload button clicked');
     const input = document.getElementById('file-upload') as HTMLInputElement;
     if (input) {
+      console.log('Triggering file input click');
       input.click();
+    } else {
+      console.error('File input element not found');
     }
   };
 
@@ -530,6 +584,7 @@ export const DocumentUpload = () => {
             onDrop={(e) => {
               e.preventDefault();
               setIsDragOver(false);
+              console.log('Files dropped:', e.dataTransfer.files.length);
               handleFileSelect(e.dataTransfer.files);
             }}
           >
@@ -544,7 +599,10 @@ export const DocumentUpload = () => {
               type="file"
               multiple
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              onChange={(e) => handleFileSelect(e.target.files)}
+              onChange={(e) => {
+                console.log('File input changed:', e.target.files?.length || 0);
+                handleFileSelect(e.target.files);
+              }}
               className="hidden"
               id="file-upload"
             />
