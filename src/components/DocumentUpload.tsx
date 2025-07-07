@@ -324,19 +324,30 @@ export const DocumentUpload = () => {
         })
         .eq('id', contract.id);
 
-      // Create document upload record
-      await supabase
+      // Create document upload record with proper data structure
+      const documentUploadData = {
+        contract_id: contract.id,
+        file_name: uploadFile.file.name,
+        file_path: storagePath,
+        file_size: uploadFile.file.size,
+        mime_type: uploadFile.file.type || 'application/octet-stream',
+        processing_status: 'completed',
+        extracted_text: typeof extractedContent === 'string' && !extractedContent.startsWith('data:') 
+          ? extractedContent.substring(0, 10000) // Limit text length to avoid issues
+          : 'Binary content processed',
+        ai_analysis: aiExtractedData
+      };
+
+      console.log('Creating document upload record with data:', documentUploadData);
+
+      const { error: uploadError } = await supabase
         .from('document_uploads')
-        .insert({
-          contract_id: contract.id,
-          file_name: uploadFile.file.name,
-          file_path: storagePath,
-          file_size: uploadFile.file.size,
-          mime_type: uploadFile.file.type,
-          processing_status: 'completed',
-          extracted_text: typeof extractedContent === 'string' && !extractedContent.startsWith('data:') ? extractedContent : 'Binary content processed',
-          ai_analysis: aiExtractedData
-        });
+        .insert(documentUploadData);
+
+      if (uploadError) {
+        console.error('Document upload record creation error:', uploadError);
+        // Log but don't fail the entire process
+      }
 
       // Create sample deadline if expiration date exists
       if (aiExtractedData.expiration_date) {
