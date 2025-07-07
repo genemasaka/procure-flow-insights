@@ -27,6 +27,7 @@ export const DocumentUpload = () => {
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
+    console.log('Files selected:', selectedFiles.length);
     const newFiles: UploadedFile[] = Array.from(selectedFiles).map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
@@ -546,17 +547,6 @@ export const DocumentUpload = () => {
     }
   };
 
-  const handleButtonClick = () => {
-    console.log('Upload button clicked');
-    const input = document.getElementById('file-upload') as HTMLInputElement;
-    if (input) {
-      console.log('Triggering file input click');
-      input.click();
-    } else {
-      console.error('File input element not found');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -603,11 +593,26 @@ export const DocumentUpload = () => {
                 console.log('File input changed:', e.target.files?.length || 0);
                 handleFileSelect(e.target.files);
               }}
-              className="hidden"
+              style={{ display: 'none' }}
               id="file-upload"
+              ref={(input) => {
+                // Store reference for button click
+                if (input) {
+                  window.fileInput = input;
+                }
+              }}
             />
             <Button 
-              onClick={handleButtonClick}
+              onClick={() => {
+                console.log('Upload button clicked');
+                const input = document.getElementById('file-upload') as HTMLInputElement;
+                if (input) {
+                  console.log('Triggering file input click');
+                  input.click();
+                } else {
+                  console.error('File input element not found');
+                }
+              }}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
               Choose Files
