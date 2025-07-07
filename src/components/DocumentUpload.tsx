@@ -159,7 +159,7 @@ export const DocumentUpload = () => {
       contract_name: contractName,
       parties_involved: [extractCounterparty(contractName)],
       contract_type: contractType,
-      status: 'active',
+      status: 'active', // Ensure status is always set
       contract_content: extractedText,
       contract_value: null,
       currency: 'USD',
@@ -200,27 +200,35 @@ export const DocumentUpload = () => {
         f.id === uploadFile.id ? { ...f, progress: 60 } : f
       ));
 
+      // Ensure all required fields have values, especially status
+      const contractData = {
+        title: aiExtractedData.contract_name || uploadFile.file.name,
+        counterparty: Array.isArray(aiExtractedData.parties_involved) 
+          ? aiExtractedData.parties_involved.join(', ') 
+          : aiExtractedData.parties_involved || 'Unknown',
+        contract_type: aiExtractedData.contract_type || 'General Contract',
+        status: aiExtractedData.status || 'active', // Always ensure status is set
+        contract_content: aiExtractedData.contract_content || extractedText,
+        contract_value: aiExtractedData.contract_value,
+        currency: aiExtractedData.currency || 'USD',
+        effective_date: aiExtractedData.effective_date,
+        expiration_date: aiExtractedData.expiration_date,
+        renewal_notice_days: aiExtractedData.renewal_notice_days || 30
+      };
+
+      console.log('Creating contract with data:', contractData);
+
       // Create contract record with AI-extracted data
       const { data: contract, error: contractError } = await supabase
         .from('contracts')
-        .insert({
-          title: aiExtractedData.contract_name || uploadFile.file.name,
-          counterparty: Array.isArray(aiExtractedData.parties_involved) 
-            ? aiExtractedData.parties_involved.join(', ') 
-            : aiExtractedData.parties_involved || 'Unknown',
-          contract_type: aiExtractedData.contract_type,
-          status: aiExtractedData.status,
-          contract_content: aiExtractedData.contract_content,
-          contract_value: aiExtractedData.contract_value,
-          currency: aiExtractedData.currency,
-          effective_date: aiExtractedData.effective_date,
-          expiration_date: aiExtractedData.expiration_date,
-          renewal_notice_days: aiExtractedData.renewal_notice_days
-        })
+        .insert(contractData)
         .select()
         .single();
 
-      if (contractError) throw contractError;
+      if (contractError) {
+        console.error('Contract creation error:', contractError);
+        throw contractError;
+      }
 
       // Update progress to show file storage
       setFiles(prev => prev.map(f => 
