@@ -123,8 +123,8 @@ Please provide accurate extraction based on the actual document content. If info
 
     console.log('Calling Gemini API with prompt length:', systemPrompt.length)
 
-    // Call Gemini API
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+    // Call Gemini API with the correct model name
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
