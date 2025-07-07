@@ -12,9 +12,11 @@ interface UploadedFile {
   id: string;
   name: string;
   size: number;
-  status: 'uploading' | 'processing' | 'completed' | 'error';
+  status: 'uploading' | 'processing' | 'completed' | 'error' | 'needs_review';
   progress: number;
   file: File;
+  errorMessage?: string;
+  missingFields?: string[];
 }
 
 export const DocumentUpload = () => {
@@ -41,6 +43,31 @@ export const DocumentUpload = () => {
     newFiles.forEach(file => {
       processUpload(file);
     });
+  };
+
+  const uploadFileToStorage = async (file: File, contractId: string): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${contractId}_${Date.now()}.${fileExt}`;
+      const filePath = `contracts/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('contract-documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+
+      return data.path;
+    } catch (error) {
+      console.error('File upload error:', error);
+      return null;
+    }
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
@@ -70,19 +97,19 @@ export const DocumentUpload = () => {
           
           Extract and return ONLY a JSON object with these fields:
           {
-            "title": "contract title",
-            "counterparty": "main counterparty name",
-            "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, General Contract",
-            "status": "one of: active, pending, expired, terminated",
-            "contract_content": "full contract text",
+            "contract_name": "contract title/name",
+            "parties_involved": ["list of parties/entities"],
+            "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, Sales Contract, General Contract",
             "contract_value": number or null,
             "currency": "USD, EUR, GBP, CAD, AUD, KES (Kenyan Shilling), or other",
             "effective_date": "YYYY-MM-DD format or null",
             "expiration_date": "YYYY-MM-DD format or null",
-            "renewal_notice_days": number or 30
+            "contract_content": "full contract text",
+            "renewal_notice_days": number or 30,
+            "status": "one of: active, pending, expired, terminated"
           }
           
-          Please ensure the JSON is valid and complete. If information is not available, use null for optional fields.`,
+          If any field cannot be extracted or is unclear, set it to null. Ensure the JSON is valid and complete.`,
           userId: 'document-processor'
         }
       });
@@ -94,7 +121,15 @@ export const DocumentUpload = () => {
           if (jsonMatch) {
             const extractedData = JSON.parse(jsonMatch[0]);
             console.log('AI extracted data:', extractedData);
-            return extractedData;
+            
+            // Validate required fields and identify missing ones
+            const requiredFields = ['contract_name', 'parties_involved', 'contract_type', 'contract_value', 'effective_date', 'expiration_date'];
+            const missingFields = requiredFields.filter(field => !extractedData[field] || extractedData[field] === null);
+            
+            return {
+              data: extractedData,
+              missingFields: missingFields
+            };
           }
         } catch (parseError) {
           console.error('Error parsing AI response:', parseError);
@@ -102,25 +137,31 @@ export const DocumentUpload = () => {
       }
 
       // Fallback extraction if AI fails
-      return extractContractInfoFallback(fileName, extractedText);
+      return {
+        data: extractContractInfoFallback(fileName, extractedText),
+        missingFields: []
+      };
     } catch (error) {
       console.error('AI processing error:', error);
-      return extractContractInfoFallback(fileName, extractedText);
+      return {
+        data: extractContractInfoFallback(fileName, extractedText),
+        missingFields: []
+      };
     }
   };
 
   const extractContractInfoFallback = (fileName: string, extractedText: string) => {
     // Fallback extraction logic
-    const contractTitle = fileName.replace(/\.[^/.]+$/, "");
+    const contractName = fileName.replace(/\.[^/.]+$/, "");
     const contractType = getContractType(fileName);
     
     return {
-      title: contractTitle,
-      counterparty: extractCounterparty(contractTitle),
+      contract_name: contractName,
+      parties_involved: [extractCounterparty(contractName)],
       contract_type: contractType,
       status: 'active',
       contract_content: extractedText,
-      contract_value: Math.floor(Math.random() * 1000000) + 10000,
+      contract_value: null,
       currency: 'USD',
       effective_date: new Date().toISOString().split('T')[0],
       expiration_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -132,7 +173,7 @@ export const DocumentUpload = () => {
     try {
       // Update progress to show uploading
       setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, progress: 20 } : f
+        f.id === uploadFile.id ? { ...f, progress: 10 } : f
       ));
 
       // Extract text from file
@@ -140,44 +181,35 @@ export const DocumentUpload = () => {
       
       // Update progress to show AI processing
       setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, progress: 40, status: 'processing' } : f
+        f.id === uploadFile.id ? { ...f, progress: 30, status: 'processing' } : f
       ));
 
+      // Show processing notification
+      toast({
+        title: "Document Processing",
+        description: `${uploadFile.file.name} is being analyzed by AI. Please wait...`,
+      });
+
       // Process with AI to extract contract information
-      const aiExtractedData = await processWithAI(uploadFile.file.name, extractedText);
+      const aiResult = await processWithAI(uploadFile.file.name, extractedText);
+      const aiExtractedData = aiResult.data;
+      const missingFields = aiResult.missingFields;
       
       // Update progress to show database insertion
       setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, progress: 70 } : f
+        f.id === uploadFile.id ? { ...f, progress: 60 } : f
       ));
-
-      // Create document upload record
-      const { data: docUpload, error: uploadError } = await supabase
-        .from('document_uploads')
-        .insert({
-          file_name: uploadFile.file.name,
-          file_path: `/uploads/${uploadFile.file.name}`,
-          file_size: uploadFile.file.size,
-          mime_type: uploadFile.file.type,
-          processing_status: 'processing',
-          extracted_text: extractedText,
-          ai_analysis: aiExtractedData
-        })
-        .select()
-        .single();
-
-      if (uploadError) throw uploadError;
 
       // Create contract record with AI-extracted data
       const { data: contract, error: contractError } = await supabase
         .from('contracts')
         .insert({
-          title: aiExtractedData.title,
-          counterparty: aiExtractedData.counterparty,
+          title: aiExtractedData.contract_name || uploadFile.file.name,
+          counterparty: Array.isArray(aiExtractedData.parties_involved) 
+            ? aiExtractedData.parties_involved.join(', ') 
+            : aiExtractedData.parties_involved || 'Unknown',
           contract_type: aiExtractedData.contract_type,
           status: aiExtractedData.status,
-          file_name: uploadFile.file.name,
-          file_path: `/uploads/${uploadFile.file.name}`,
           contract_content: aiExtractedData.contract_content,
           contract_value: aiExtractedData.contract_value,
           currency: aiExtractedData.currency,
@@ -190,16 +222,42 @@ export const DocumentUpload = () => {
 
       if (contractError) throw contractError;
 
-      // Update document upload with contract reference
+      // Update progress to show file storage
+      setFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, progress: 80 } : f
+      ));
+
+      // Upload file to Supabase storage
+      const storagePath = await uploadFileToStorage(uploadFile.file, contract.id);
+      
+      if (!storagePath) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      // Update contract with file path
+      await supabase
+        .from('contracts')
+        .update({ 
+          file_name: uploadFile.file.name,
+          file_path: storagePath
+        })
+        .eq('id', contract.id);
+
+      // Create document upload record
       await supabase
         .from('document_uploads')
-        .update({ 
+        .insert({
           contract_id: contract.id,
-          processing_status: 'completed'
-        })
-        .eq('id', docUpload.id);
+          file_name: uploadFile.file.name,
+          file_path: storagePath,
+          file_size: uploadFile.file.size,
+          mime_type: uploadFile.file.type,
+          processing_status: 'completed',
+          extracted_text: extractedText,
+          ai_analysis: aiExtractedData
+        });
 
-      // Create sample deadline based on contract dates
+      // Create sample deadline if expiration date exists
       if (aiExtractedData.expiration_date) {
         const expirationDate = new Date(aiExtractedData.expiration_date);
         const reminderDate = new Date(expirationDate);
@@ -209,30 +267,38 @@ export const DocumentUpload = () => {
           .from('deadlines')
           .insert({
             contract_id: contract.id,
-            title: `${aiExtractedData.title} Renewal Notice`,
-            description: `Contract renewal deadline for ${aiExtractedData.title}`,
+            title: `${aiExtractedData.contract_name} Renewal Notice`,
+            description: `Contract renewal deadline for ${aiExtractedData.contract_name}`,
             due_date: reminderDate.toISOString().split('T')[0],
             type: 'renewal',
             priority: 'medium'
           });
       }
 
-      // Create AI insight based on the analysis
+      // Create AI insight
       await supabase
         .from('ai_insights')
         .insert({
           contract_id: contract.id,
           title: `Contract Analysis Complete`,
-          description: `AI has successfully analyzed and extracted key information from ${uploadFile.file.name}. Key terms and obligations have been identified.`,
-          insight_type: 'opportunity',
+          description: `AI has successfully analyzed and extracted key information from ${uploadFile.file.name}. ${missingFields.length > 0 ? `Note: ${missingFields.length} fields require manual review.` : 'All key fields were successfully extracted.'}`,
+          insight_type: missingFields.length > 0 ? 'risk' : 'opportunity',
           impact: 'medium',
-          confidence: 85,
-          actionable: true
+          confidence: missingFields.length > 0 ? 70 : 90,
+          actionable: missingFields.length > 0
         });
 
+      // Determine final status
+      const finalStatus = missingFields.length > 0 ? 'needs_review' : 'completed';
+      
       // Update progress to completed
       setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, progress: 100, status: 'completed' } : f
+        f.id === uploadFile.id ? { 
+          ...f, 
+          progress: 100, 
+          status: finalStatus,
+          missingFields: missingFields.length > 0 ? missingFields : undefined
+        } : f
       ));
 
       // Refresh queries to show new data
@@ -240,20 +306,33 @@ export const DocumentUpload = () => {
       queryClient.invalidateQueries({ queryKey: ['deadlines'] });
       queryClient.invalidateQueries({ queryKey: ['ai_insights'] });
 
-      toast({
-        title: "AI Processing Complete",
-        description: `${uploadFile.file.name} has been analyzed and contract details have been automatically extracted.`,
-      });
+      // Show completion notification
+      if (missingFields.length > 0) {
+        toast({
+          title: "Processing Complete - Review Required",
+          description: `${uploadFile.file.name} has been processed, but ${missingFields.length} fields need manual review. Please check the contract details.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "AI Processing Complete",
+          description: `${uploadFile.file.name} has been successfully analyzed and all contract details have been automatically extracted.`,
+        });
+      }
 
     } catch (error) {
       console.error('Upload error:', error);
       setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, status: 'error' } : f
+        f.id === uploadFile.id ? { 
+          ...f, 
+          status: 'error',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error occurred'
+        } : f
       ));
       
       toast({
         title: "Processing Failed",
-        description: `Failed to process ${uploadFile.file.name}. Please try again.`,
+        description: `Failed to process ${uploadFile.file.name}. ${error instanceof Error ? error.message : 'Please try again or contact support.'}`,
         variant: "destructive"
       });
     }
@@ -268,6 +347,7 @@ export const DocumentUpload = () => {
     if (name.includes('employment') || name.includes('hire')) return 'Employment Contract';
     if (name.includes('nda') || name.includes('confidential')) return 'NDA';
     if (name.includes('partnership')) return 'Partnership Agreement';
+    if (name.includes('sale') || name.includes('purchase')) return 'Sales Contract';
     return 'General Contract';
   };
 
@@ -298,10 +378,29 @@ export const DocumentUpload = () => {
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error':
         return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case 'needs_review':
+        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
       case 'processing':
         return <Sparkles className="w-5 h-5 text-purple-500 animate-pulse" />;
       default:
         return <FileText className="w-5 h-5 text-blue-500" />;
+    }
+  };
+
+  const getStatusMessage = (file: UploadedFile) => {
+    switch (file.status) {
+      case 'uploading':
+        return 'Uploading and extracting text...';
+      case 'processing':
+        return 'AI analyzing contract content...';
+      case 'completed':
+        return '✓ AI analysis complete - All contract details extracted and saved';
+      case 'needs_review':
+        return `⚠ Processing complete - ${file.missingFields?.length} fields need manual review`;
+      case 'error':
+        return `✗ ${file.errorMessage || 'Processing failed - Please try again or contact support'}`;
+      default:
+        return '';
     }
   };
 
@@ -314,7 +413,7 @@ export const DocumentUpload = () => {
             Upload Contract Documents
           </CardTitle>
           <CardDescription>
-            Upload PDF, Word, or image files. AI will automatically extract contract information including parties, terms, dates, and values.
+            Upload PDF, Word, or image files. AI will automatically analyze and extract contract information including parties, terms, dates, values, and content. Files are securely stored and encrypted.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -375,24 +474,28 @@ export const DocumentUpload = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900 truncate">{file.name}</p>
                     <p className="text-sm text-slate-500">{formatFileSize(file.size)}</p>
-                    {file.status !== 'completed' && file.status !== 'error' && (
+                    {file.status !== 'completed' && file.status !== 'error' && file.status !== 'needs_review' && (
                       <div className="mt-2">
                         <Progress value={file.progress} className="h-2" />
                         <p className="text-xs text-slate-500 mt-1">
-                          {file.status === 'uploading' && 'Uploading file...'}
-                          {file.status === 'processing' && 'AI analyzing contract...'}
+                          {getStatusMessage(file)}
                         </p>
                       </div>
                     )}
-                    {file.status === 'completed' && (
-                      <p className="text-sm text-green-600 mt-1">
-                        ✓ AI analysis complete - Contract details extracted and saved
+                    {(file.status === 'completed' || file.status === 'needs_review' || file.status === 'error') && (
+                      <p className={`text-sm mt-1 ${
+                        file.status === 'completed' ? 'text-green-600' :
+                        file.status === 'needs_review' ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {getStatusMessage(file)}
                       </p>
                     )}
-                    {file.status === 'error' && (
-                      <p className="text-sm text-red-600 mt-1">
-                        ✗ Failed to process - Please try again
-                      </p>
+                    {file.missingFields && file.missingFields.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-yellow-700 font-medium">Fields requiring manual review:</p>
+                        <p className="text-xs text-yellow-600">{file.missingFields.join(', ')}</p>
+                      </div>
                     )}
                   </div>
                   <Button
@@ -417,16 +520,18 @@ export const DocumentUpload = () => {
               <Sparkles className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-purple-900 mb-2">Enhanced AI Contract Processing</h3>
+              <h3 className="font-semibold text-purple-900 mb-2">Secure AI Contract Processing</h3>
               <p className="text-purple-800 text-sm mb-3">
-                Our advanced AI automatically extracts comprehensive contract information including:
+                Our advanced AI automatically extracts comprehensive contract information with enterprise-grade security:
               </p>
               <ul className="text-sm text-purple-700 space-y-1">
-                <li>• Contract title and parties involved</li>
+                <li>• Contract name and parties involved</li>
                 <li>• Contract type, status, and key terms</li>
                 <li>• Financial details including value and currency (USD, EUR, KES, etc.)</li>
-                <li>• Important dates, terms, and renewal periods</li>
+                <li>• Important dates and renewal terms</li>
                 <li>• Full contract content analysis</li>
+                <li>• Secure file storage with encryption</li>
+                <li>• Error handling with manual review options</li>
               </ul>
             </div>
           </div>
