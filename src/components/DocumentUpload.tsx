@@ -404,6 +404,13 @@ export const DocumentUpload = () => {
     }
   };
 
+  const handleButtonClick = () => {
+    const input = document.getElementById('file-upload') as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -449,10 +456,11 @@ export const DocumentUpload = () => {
               className="hidden"
               id="file-upload"
             />
-            <Button asChild className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <label htmlFor="file-upload" className="cursor-pointer">
-                Choose Files
-              </label>
+            <Button 
+              onClick={handleButtonClick}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              Choose Files
             </Button>
           </div>
         </CardContent>
