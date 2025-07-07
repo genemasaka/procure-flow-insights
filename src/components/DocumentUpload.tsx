@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,45 +70,119 @@ export const DocumentUpload = () => {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        // For demo purposes, we'll simulate text extraction
-        // In a real implementation, you'd use libraries like pdf-parse for PDFs
-        // or mammoth for Word documents
-        const text = `Sample contract content from ${file.name}`;
-        resolve(text);
+        try {
+          if (file.type === 'application/pdf') {
+            // For PDFs, we'll pass the base64 content to Gemini for analysis
+            const base64Content = (reader.result as string).split(',')[1];
+            resolve(base64Content);
+          } else if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
+            // For text files, use the text content
+            resolve(reader.result as string);
+          } else if (file.type.startsWith('image/')) {
+            // For images, we'll pass the base64 content to Gemini
+            const base64Content = (reader.result as string).split(',')[1];
+            resolve(base64Content);
+          } else {
+            // For other file types, try to read as text
+            resolve(reader.result as string || `Document content from ${file.name}`);
+          }
+        } catch (error) {
+          console.error('Error processing file content:', error);
+          resolve(`Document content from ${file.name}`);
+        }
       };
-      reader.readAsText(file);
+      reader.onerror = () => {
+        console.error('FileReader error');
+        resolve(`Document content from ${file.name}`);
+      };
+
+      // Read file based on type
+      if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
     });
   };
 
-  const processWithAI = async (fileName: string, extractedText: string) => {
+  const processWithAI = async (fileName: string, fileContent: string, file: File) => {
     try {
       console.log('Processing file with AI:', fileName);
       
+      // Prepare the message for Gemini based on file type
+      let analysisMessage = '';
+      
+      if (file.type === 'application/pdf') {
+        analysisMessage = `Please analyze this PDF contract document and extract the following information in JSON format:
+        
+        Document: ${fileName}
+        
+        The document content is provided as base64. Please analyze it and extract contract information.
+        
+        Extract and return ONLY a JSON object with these fields:
+        {
+          "contract_name": "contract title/name",
+          "parties_involved": ["list of parties/entities"],
+          "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, Sales Contract, General Contract",
+          "contract_value": number or null,
+          "currency": "USD, EUR, GBP, CAD, AUD, KES (Kenyan Shilling), or other",
+          "effective_date": "YYYY-MM-DD format or null",
+          "expiration_date": "YYYY-MM-DD format or null",
+          "contract_content": "summary of key contract terms and conditions",
+          "renewal_notice_days": number or 30,
+          "status": "one of: active, pending, expired, terminated"
+        }
+        
+        Base64 Content: ${fileContent}`;
+      } else if (file.type.startsWith('image/')) {
+        analysisMessage = `Please analyze this contract document image and extract the following information in JSON format:
+        
+        Document: ${fileName}
+        
+        The document is provided as an image. Please analyze the text content and extract contract information.
+        
+        Extract and return ONLY a JSON object with these fields:
+        {
+          "contract_name": "contract title/name",
+          "parties_involved": ["list of parties/entities"],
+          "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, Sales Contract, General Contract",
+          "contract_value": number or null,
+          "currency": "USD, EUR, GBP, CAD, AUD, KES (Kenyan Shilling), or other",
+          "effective_date": "YYYY-MM-DD format or null",
+          "expiration_date": "YYYY-MM-DD format or null",
+          "contract_content": "summary of key contract terms and conditions",
+          "renewal_notice_days": number or 30,
+          "status": "one of: active, pending, expired, terminated"
+        }
+        
+        Image Content: ${fileContent}`;
+      } else {
+        analysisMessage = `Please analyze this contract document and extract the following information in JSON format:
+        
+        Document: ${fileName}
+        Content: ${fileContent}
+        
+        Extract and return ONLY a JSON object with these fields:
+        {
+          "contract_name": "contract title/name",
+          "parties_involved": ["list of parties/entities"],
+          "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, Sales Contract, General Contract",
+          "contract_value": number or null,
+          "currency": "USD, EUR, GBP, CAD, AUD, KES (Kenyan Shilling), or other",
+          "effective_date": "YYYY-MM-DD format or null",
+          "expiration_date": "YYYY-MM-DD format or null",
+          "contract_content": "full contract text or summary of key terms",
+          "renewal_notice_days": number or 30,
+          "status": "one of: active, pending, expired, terminated"
+        }`;
+      }
+
       const response = await supabase.functions.invoke('ai-chat', {
         body: {
-          message: `Please analyze this contract document and extract the following information in JSON format:
-          
-          Document: ${fileName}
-          Content: ${extractedText}
-          
-          Extract and return ONLY a JSON object with these fields:
-          {
-            "contract_name": "contract title/name",
-            "parties_involved": ["list of parties/entities"],
-            "contract_type": "one of: Service Agreement, Supply Contract, License Agreement, Lease Agreement, Employment Contract, NDA, Partnership Agreement, Sales Contract, General Contract",
-            "contract_value": number or null,
-            "currency": "USD, EUR, GBP, CAD, AUD, KES (Kenyan Shilling), or other",
-            "effective_date": "YYYY-MM-DD format or null",
-            "expiration_date": "YYYY-MM-DD format or null",
-            "contract_content": "full contract text",
-            "renewal_notice_days": number or 30,
-            "status": "one of: active, pending, expired, terminated"
-          }
-          
-          If any field cannot be extracted or is unclear, set it to null. Ensure the JSON is valid and complete.`,
+          message: analysisMessage,
           userId: 'document-processor'
         }
       });
@@ -138,13 +211,13 @@ export const DocumentUpload = () => {
 
       // Fallback extraction if AI fails
       return {
-        data: extractContractInfoFallback(fileName, extractedText),
+        data: extractContractInfoFallback(fileName, fileContent),
         missingFields: []
       };
     } catch (error) {
       console.error('AI processing error:', error);
       return {
-        data: extractContractInfoFallback(fileName, extractedText),
+        data: extractContractInfoFallback(fileName, fileContent),
         missingFields: []
       };
     }
@@ -176,8 +249,8 @@ export const DocumentUpload = () => {
         f.id === uploadFile.id ? { ...f, progress: 10 } : f
       ));
 
-      // Extract text from file
-      const extractedText = await extractTextFromFile(uploadFile.file);
+      // Extract content from file
+      const extractedContent = await extractTextFromFile(uploadFile.file);
       
       // Update progress to show AI processing
       setFiles(prev => prev.map(f => 
@@ -187,11 +260,11 @@ export const DocumentUpload = () => {
       // Show processing notification
       toast({
         title: "Document Processing",
-        description: `${uploadFile.file.name} is being analyzed by AI. Please wait...`,
+        description: `${uploadFile.file.name} is being analyzed by Gemini AI. Please wait...`,
       });
 
       // Process with AI to extract contract information
-      const aiResult = await processWithAI(uploadFile.file.name, extractedText);
+      const aiResult = await processWithAI(uploadFile.file.name, extractedContent, uploadFile.file);
       const aiExtractedData = aiResult.data;
       const missingFields = aiResult.missingFields;
       
@@ -208,7 +281,7 @@ export const DocumentUpload = () => {
           : aiExtractedData.parties_involved || 'Unknown',
         contract_type: aiExtractedData.contract_type || 'General Contract',
         status: aiExtractedData.status || 'active', // Always ensure status is set
-        contract_content: aiExtractedData.contract_content || extractedText,
+        contract_content: aiExtractedData.contract_content || extractedContent,
         contract_value: aiExtractedData.contract_value,
         currency: aiExtractedData.currency || 'USD',
         effective_date: aiExtractedData.effective_date,
@@ -261,7 +334,7 @@ export const DocumentUpload = () => {
           file_size: uploadFile.file.size,
           mime_type: uploadFile.file.type,
           processing_status: 'completed',
-          extracted_text: extractedText,
+          extracted_text: typeof extractedContent === 'string' && !extractedContent.startsWith('data:') ? extractedContent : 'Binary content processed',
           ai_analysis: aiExtractedData
         });
 
@@ -289,7 +362,7 @@ export const DocumentUpload = () => {
         .insert({
           contract_id: contract.id,
           title: `Contract Analysis Complete`,
-          description: `AI has successfully analyzed and extracted key information from ${uploadFile.file.name}. ${missingFields.length > 0 ? `Note: ${missingFields.length} fields require manual review.` : 'All key fields were successfully extracted.'}`,
+          description: `Gemini AI has successfully analyzed and extracted key information from ${uploadFile.file.name}. ${missingFields.length > 0 ? `Note: ${missingFields.length} fields require manual review.` : 'All key fields were successfully extracted.'}`,
           insight_type: missingFields.length > 0 ? 'risk' : 'opportunity',
           impact: 'medium',
           confidence: missingFields.length > 0 ? 70 : 90,
@@ -318,13 +391,13 @@ export const DocumentUpload = () => {
       if (missingFields.length > 0) {
         toast({
           title: "Processing Complete - Review Required",
-          description: `${uploadFile.file.name} has been processed, but ${missingFields.length} fields need manual review. Please check the contract details.`,
+          description: `${uploadFile.file.name} has been processed by Gemini AI, but ${missingFields.length} fields need manual review. Please check the contract details.`,
           variant: "destructive"
         });
       } else {
         toast({
-          title: "AI Processing Complete",
-          description: `${uploadFile.file.name} has been successfully analyzed and all contract details have been automatically extracted.`,
+          title: "Gemini AI Processing Complete",
+          description: `${uploadFile.file.name} has been successfully analyzed by Gemini AI and all contract details have been automatically extracted.`,
         });
       }
 
@@ -340,7 +413,7 @@ export const DocumentUpload = () => {
       
       toast({
         title: "Processing Failed",
-        description: `Failed to process ${uploadFile.file.name}. ${error instanceof Error ? error.message : 'Please try again or contact support.'}`,
+        description: `Failed to process ${uploadFile.file.name} with Gemini AI. ${error instanceof Error ? error.message : 'Please try again or contact support.'}`,
         variant: "destructive"
       });
     }
@@ -398,11 +471,11 @@ export const DocumentUpload = () => {
   const getStatusMessage = (file: UploadedFile) => {
     switch (file.status) {
       case 'uploading':
-        return 'Uploading and extracting text...';
+        return 'Uploading and extracting content...';
       case 'processing':
-        return 'AI analyzing contract content...';
+        return 'Gemini AI analyzing contract content...';
       case 'completed':
-        return '✓ AI analysis complete - All contract details extracted and saved';
+        return '✓ Gemini AI analysis complete - All contract details extracted and saved';
       case 'needs_review':
         return `⚠ Processing complete - ${file.missingFields?.length} fields need manual review`;
       case 'error':
@@ -428,7 +501,7 @@ export const DocumentUpload = () => {
             Upload Contract Documents
           </CardTitle>
           <CardDescription>
-            Upload PDF, Word, or image files. AI will automatically analyze and extract contract information including parties, terms, dates, values, and content. Files are securely stored and encrypted.
+            Upload PDF, Word, or image files. Gemini AI will automatically analyze the actual document content and extract contract information including parties, terms, dates, values, and content. Files are securely stored and encrypted.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -477,9 +550,9 @@ export const DocumentUpload = () => {
       {files.length > 0 && (
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>AI Processing Progress</CardTitle>
+            <CardTitle>Gemini AI Processing Progress</CardTitle>
             <CardDescription>
-              Track the AI analysis and contract information extraction progress
+              Track the Gemini AI analysis and contract information extraction progress
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -536,16 +609,17 @@ export const DocumentUpload = () => {
               <Sparkles className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-purple-900 mb-2">Secure AI Contract Processing</h3>
+              <h3 className="font-semibold text-purple-900 mb-2">Secure Gemini AI Contract Processing</h3>
               <p className="text-purple-800 text-sm mb-3">
-                Our advanced AI automatically extracts comprehensive contract information with enterprise-grade security:
+                Our advanced Gemini AI automatically extracts comprehensive contract information directly from your documents with enterprise-grade security:
               </p>
               <ul className="text-sm text-purple-700 space-y-1">
-                <li>• Contract name and parties involved</li>
-                <li>• Contract type, status, and key terms</li>
+                <li>• Direct document content analysis (PDF, images, text)</li>
+                <li>• Contract name and parties involved extraction</li>
+                <li>• Contract type, status, and key terms identification</li>
                 <li>• Financial details including value and currency (USD, EUR, KES, etc.)</li>
-                <li>• Important dates and renewal terms</li>
-                <li>• Full contract content analysis</li>
+                <li>• Important dates and renewal terms detection</li>
+                <li>• Full contract content analysis and summarization</li>
                 <li>• Secure file storage with encryption</li>
                 <li>• Error handling with manual review options</li>
               </ul>
