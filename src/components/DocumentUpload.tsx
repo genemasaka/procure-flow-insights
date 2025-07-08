@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +23,7 @@ export const DocumentUpload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -595,20 +596,14 @@ export const DocumentUpload = () => {
               }}
               style={{ display: 'none' }}
               id="file-upload"
-              ref={(input) => {
-                // Store reference for button click
-                if (input) {
-                  window.fileInput = input;
-                }
-              }}
+              ref={fileInputRef}
             />
             <Button 
               onClick={() => {
                 console.log('Upload button clicked');
-                const input = document.getElementById('file-upload') as HTMLInputElement;
-                if (input) {
+                if (fileInputRef.current) {
                   console.log('Triggering file input click');
-                  input.click();
+                  fileInputRef.current.click();
                 } else {
                   console.error('File input element not found');
                 }
