@@ -6,6 +6,7 @@ import { Upload, FileText, AlertCircle, AlertTriangle, CheckCircle, X, FileUp, S
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { TextExtractor, type ExtractionResult } from "@/lib/textExtractor";
 
 interface UploadedFile {
   id: string;
@@ -75,56 +76,68 @@ export const DocumentUpload = () => {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    console.log('Extracting text from file:', file.name, 'Type:', file.type);
+    console.log('TextExtractor: Starting robust text extraction for:', file.name, 'Type:', file.type);
     
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    try {
+      // Use the new robust TextExtractor
+      const result: ExtractionResult = await TextExtractor.extractText(file);
       
-      reader.onload = () => {
-        try {
-          console.log('FileReader onload triggered for:', file.name);
-          
-          if (file.type === 'application/pdf') {
-            // For PDFs, we'll pass the base64 content to Gemini for analysis
-            const base64Content = (reader.result as string).split(',')[1];
-            console.log('PDF content extracted, base64 length:', base64Content?.length || 0);
-            resolve(base64Content || '');
-          } else if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
-            // For text files, use the text content
-            const textContent = reader.result as string;
-            console.log('Text content extracted, length:', textContent?.length || 0);
-            resolve(textContent || '');
-          } else if (file.type.startsWith('image/')) {
-            // For images, we'll pass the base64 content to Gemini
-            const base64Content = (reader.result as string).split(',')[1];
-            console.log('Image content extracted, base64 length:', base64Content?.length || 0);
-            resolve(base64Content || '');
-          } else {
-            // For other file types, try to read as text
-            const content = reader.result as string || `Document content from ${file.name}`;
-            console.log('Other file type content extracted, length:', content.length);
-            resolve(content);
-          }
-        } catch (error) {
-          console.error('Error processing file content:', error);
-          resolve(`Document content from ${file.name}`);
-        }
-      };
+      console.log('TextExtractor: Extraction completed successfully');
+      console.log('Method used:', result.method);
+      console.log('Confidence:', result.confidence);
+      console.log('Text length:', result.text.length);
+      console.log('Metadata:', result.metadata);
       
-      reader.onerror = () => {
-        console.error('FileReader error for:', file.name);
-        resolve(`Document content from ${file.name}`);
-      };
-
-      // Read file based on type
-      if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-        console.log('Reading file as data URL for:', file.name);
-        reader.readAsDataURL(file);
-      } else {
-        console.log('Reading file as text for:', file.name);
-        reader.readAsText(file);
+      // Show user feedback about extraction quality
+      if (result.confidence < 0.5) {
+        toast({
+          title: "Low Quality Text Extraction",
+          description: `Text extraction from ${file.name} had low confidence (${Math.round(result.confidence * 100)}%). Please review the results carefully.`,
+          variant: "destructive"
+        });
+      } else if (result.confidence > 0.8) {
+        toast({
+          title: "High Quality Text Extraction",
+          description: `Successfully extracted text from ${file.name} using ${result.method} with ${Math.round(result.confidence * 100)}% confidence.`,
+        });
       }
-    });
+      
+      return result.text;
+      
+    } catch (error) {
+      console.error('TextExtractor: Robust extraction failed, using fallback:', error);
+      
+      // Fallback to basic extraction if robust extraction fails
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+          try {
+            if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+              const base64Content = (reader.result as string).split(',')[1];
+              resolve(base64Content || `Document content from ${file.name}`);
+            } else {
+              const textContent = reader.result as string;
+              resolve(textContent || `Document content from ${file.name}`);
+            }
+          } catch (fallbackError) {
+            console.error('Even fallback extraction failed:', fallbackError);
+            resolve(`Document content from ${file.name}`);
+          }
+        };
+        
+        reader.onerror = () => {
+          console.error('FileReader error during fallback');
+          resolve(`Document content from ${file.name}`);
+        };
+
+        if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+          reader.readAsDataURL(file);
+        } else {
+          reader.readAsText(file);
+        }
+      });
+    }
   };
 
   const processWithAI = async (fileName: string, fileContent: string, file: File) => {
@@ -557,7 +570,7 @@ export const DocumentUpload = () => {
             Upload Contract Documents
           </CardTitle>
           <CardDescription>
-            Upload PDF, Word, or image files. Gemini AI will automatically analyze the actual document content and extract contract information including parties, terms, dates, values, and content. Files are securely stored and encrypted.
+            Upload PDF, DOCX, or image files. Advanced text extraction powered by PDF.js, Mammoth, and Tesseract OCR ensures accurate content analysis. Gemini AI then extracts contract information with confidence scoring. Files are securely stored and encrypted.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -584,12 +597,12 @@ export const DocumentUpload = () => {
               Drop files here or click to browse
             </h3>
             <p className="text-slate-500 mb-4">
-              Supports PDF, DOC, DOCX, JPG, PNG files up to 10MB
+              Supports PDF, DOCX, JPG, PNG files up to 10MB with advanced text extraction
             </p>
             <input
               type="file"
               multiple
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,.txt"
               onChange={(e) => {
                 console.log('File input changed:', e.target.files?.length || 0);
                 handleFileSelect(e.target.files);
