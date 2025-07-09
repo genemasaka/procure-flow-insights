@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +8,8 @@ import { useAIInsights } from "@/hooks/useContracts";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { useNavigate } from 'react-router-dom';
 
 interface AIInsightsProps {
   expanded?: boolean;
@@ -19,6 +20,7 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
   const [actioningInsight, setActioningInsight] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -92,6 +94,25 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
     } finally {
       setActioningInsight(null);
     }
+  };
+
+  // Helper to extract a brief summary from the description or a summary field
+  const getInsightSummary = (insight: any) => {
+    // If a summary field exists, use it; otherwise, parse description for key points
+    if (insight.summary) return insight.summary;
+    if (insight.description) {
+      // Try to extract sentences with key info
+      const match = insight.description.match(/(risk|opportunit|deadline|missing|term|renewal|value|amount|currency|counterparty|date|status|review|clause|payment|compliance|alert|action)/i);
+      if (match) {
+        // Return the sentence containing the keyword
+        const sentences = insight.description.split('. ');
+        const found = sentences.find(s => match[0] && s.toLowerCase().includes(match[0].toLowerCase()));
+        return found ? found + '.' : sentences[0];
+      }
+      // Fallback: first sentence
+      return insight.description.split('. ')[0] + '.';
+    }
+    return 'No summary available.';
   };
 
   if (isLoading) {
@@ -184,7 +205,8 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
                   </div>
 
                   <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
-                  <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+                  <p className="text-sm text-slate-700 mb-2 font-medium">{getInsightSummary(insight)}</p>
+                  <p className="text-xs text-slate-500 mb-3">{insight.description}</p>
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -195,24 +217,38 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
                       </div>
                     </div>
                     {insight.actionable && (
-                      <Button 
-                        size="sm" 
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                        onClick={() => handleTakeAction(insight.id, insight.title)}
-                        disabled={isActioning}
-                      >
-                        {isActioning ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                            Processing...
-                          </>
-                        ) : (
-                          <>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                            disabled={isActioning}
+                          >
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Take Action
-                          </>
-                        )}
-                      </Button>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}`)}>
+                            View Contract Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit`)}>
+                            Edit Contract
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit#deadlines`)}>
+                            Add/Edit Deadline
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTakeAction(insight.id, insight.title)}>
+                            Mark as Reviewed
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => window.open(`/api/contracts/${insight.contract_id}/download`, '_blank')}>
+                            Download Contract
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => alert('Notify stakeholders feature coming soon!')}>
+                            Notify Stakeholders
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </div>

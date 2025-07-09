@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import allCurrencies from 'currency-codes/data';
 
 interface Contract {
   id: string;
@@ -404,11 +405,9 @@ const EditContract = () => {
                       <SelectValue placeholder="Select currency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="CAD">CAD</SelectItem>
-                      <SelectItem value="AUD">AUD</SelectItem>
+                      {allCurrencies.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>{currency.code} - {currency.currency}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

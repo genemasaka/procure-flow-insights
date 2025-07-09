@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { TextExtractor, type ExtractionResult } from "@/lib/textExtractor";
+import { useNavigate } from "react-router-dom";
 
 interface UploadedFile {
   id: string;
@@ -25,6 +26,7 @@ export const DocumentUpload = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -475,6 +477,11 @@ export const DocumentUpload = () => {
           title: "Gemini AI Processing Complete",
           description: `${uploadFile.file.name} has been successfully analyzed by Gemini AI and all contract details have been automatically extracted.`,
         });
+      }
+
+      // After all processing is done and contract is created, redirect to edit page
+      if (contract && contract.id) {
+        navigate(`/contracts/${contract.id}/edit`);
       }
 
     } catch (error) {

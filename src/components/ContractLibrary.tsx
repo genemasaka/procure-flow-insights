@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, Calendar, DollarSign, Upload, Eye, Edit } from "lucide-react";
+import { Search, FileText, Calendar, DollarSign, Upload, Eye, Edit, AlertTriangle } from "lucide-react";
 import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
+import { sumContractValues, averageContractValue, daysBetween, riskScore } from '@/lib/utils';
 
 export const ContractLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,6 +91,14 @@ export const ContractLibrary = () => {
     );
   }
 
+  if (!contracts) return null;
+
+  // Math: Portfolio calculations
+  const totalValue = sumContractValues(contracts);
+  const avgValue = averageContractValue(contracts);
+  const soonExpiring = contracts.filter(c => c.expiration_date && daysBetween(new Date(), c.expiration_date) <= 30).length;
+  const portfolioRisk = riskScore(totalValue, soonExpiring);
+
   return (
     <div className="space-y-6">
       {/* Search and Filters */}
@@ -129,6 +138,34 @@ export const ContractLibrary = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Portfolio Overview */}
+      <div className="grid gap-4">
+        <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Portfolio Value
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{totalValue.toLocaleString()}</div>
+            <div className="text-sm text-slate-500">Average: {avgValue.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Portfolio Risk
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{portfolioRisk}</div>
+            <div className="text-sm text-slate-500">Risk Score (0-5)</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Contract List */}
       <div className="grid gap-4">
