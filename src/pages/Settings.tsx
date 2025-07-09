@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +7,10 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings as SettingsIcon, User, Bell, Mail, ArrowLeft } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Mail, ArrowLeft, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import allCurrencies from 'currency-codes/data';
+import { fetchExchangeRates, aggregatePortfolioValue } from '@/lib/currencyUtils';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -20,6 +21,15 @@ const Settings = () => {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [defaultCurrency, setDefaultCurrency] = useState(() => localStorage.getItem('defaultCurrency') || 'USD');
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const [firstName, setFirstName] = useState(user?.user_metadata?.first_name || "");
+  const [lastName, setLastName] = useState(user?.user_metadata?.last_name || "");
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  useEffect(() => {
+    fetchExchangeRates(defaultCurrency).then(setExchangeRates);
+  }, [defaultCurrency]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +79,37 @@ const Settings = () => {
     }
   };
 
+  const handleDefaultCurrencyChange = (currency: string) => {
+    setDefaultCurrency(currency);
+    localStorage.setItem('defaultCurrency', currency);
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -98,7 +139,7 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -110,16 +151,29 @@ const Settings = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="firstName">First Name</Label>
                   <Input
-                    id="name"
-                    value={user?.user_metadata?.first_name && user?.user_metadata?.last_name
-                      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-                      : ""}
-                    placeholder="Enter your full name"
+                    id="firstName"
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    placeholder="Enter your first name"
                   />
                 </div>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    placeholder="Enter your last name"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit" disabled={profileLoading} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                    {profileLoading ? "Saving..." : "Save Profile"}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
 
@@ -210,6 +264,35 @@ const Settings = () => {
                   checked={pushNotifications}
                   onCheckedChange={setPushNotifications}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Currency Settings */}
+          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Default Currency
+              </CardTitle>
+              <CardDescription>
+                Select your preferred default currency for portfolio aggregation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="default-currency">Default Currency</Label>
+                <select
+                  id="default-currency"
+                  value={defaultCurrency}
+                  onChange={e => handleDefaultCurrencyChange(e.target.value)}
+                  className="w-full border rounded p-2"
+                >
+                  {allCurrencies.map((c: any) => (
+                    <option key={c.code} value={c.code}>{c.code} - {c.currency}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500">All portfolio values will be shown in this currency.</p>
               </div>
             </CardContent>
           </Card>
