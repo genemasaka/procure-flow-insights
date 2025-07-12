@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentUpload } from "@/components/DocumentUpload";
@@ -26,7 +25,7 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
       </div>
     );
   }
@@ -103,7 +102,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="library">
-            <ContractLibrary />
+            <ContractLibrary setActiveTab={setActiveTab} />
           </TabsContent>
 
           <TabsContent value="timeline">

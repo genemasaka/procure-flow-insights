@@ -10,7 +10,11 @@ import { format } from "date-fns";
 import { sumContractValues, averageContractValue, daysBetween, riskScore } from '@/lib/utils';
 import { fetchExchangeRates, aggregatePortfolioValue } from '@/lib/currencyUtils';
 
-export const ContractLibrary = () => {
+interface ContractLibraryProps {
+  setActiveTab: (tab: string) => void;
+}
+
+export const ContractLibrary = ({ setActiveTab }: ContractLibraryProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedContract, setSelectedContract] = useState<string | null>(null);
@@ -66,12 +70,8 @@ export const ContractLibrary = () => {
   };
 
   const handleAddContract = () => {
-    // Switch to upload tab
-    const tabsElement = document.querySelector('[data-state="active"]')?.closest('[role="tablist"]');
-    if (tabsElement) {
-      const uploadTab = tabsElement.querySelector('[value="upload"]') as HTMLButtonElement;
-      uploadTab?.click();
-    }
+    // Use the setActiveTab prop to switch to the upload tab
+    setActiveTab('upload');
   };
 
   if (isLoading) {
@@ -107,6 +107,7 @@ export const ContractLibrary = () => {
   const soonExpiring = contracts.filter(c => c.expiration_date && daysBetween(new Date(), c.expiration_date) <= 30).length;
   const portfolioRisk = riskScore(totalValue, soonExpiring);
   const aggregatedValue = exchangeRates ? aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates) : null;
+
 
   return (
     <div className="space-y-6">
