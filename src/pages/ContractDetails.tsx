@@ -75,11 +75,11 @@ const ContractDetails = () => {
     }
   };
 
-  const formatCurrency = (value: number | null) => {
+  const formatCurrency = (value: number | null, currency: string | null) => {
     if (!value) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: currency || 'USD'
     }).format(value);
   };
 
@@ -161,9 +161,9 @@ const ContractDetails = () => {
                     <DollarSign className="w-4 h-4" />
                     Contract Value
                   </div>
-                  <p className="text-slate-900 text-xl font-semibold">
-                    {formatCurrency(contract.contract_value)}
-                  </p>
+                   <p className="text-slate-900 text-xl font-semibold">
+                     {formatCurrency(contract.contract_value, contract.currency)}
+                   </p>
                 </div>
                 
                 <div className="space-y-2">
