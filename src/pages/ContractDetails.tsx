@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ArrowLeft, FileText, Calendar, DollarSign, User, Edit, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { GenerateInsightsButton } from "@/components/GenerateInsightsButton";
 
 interface Contract {
   id: string;
@@ -126,6 +127,11 @@ const ContractDetails = () => {
               <Badge variant="outline" className={getStatusColor(contract.status)}>
                 {contract.status}
               </Badge>
+              <GenerateInsightsButton 
+                contractId={contract.id}
+                variant="outline"
+                className="mr-2"
+              />
               <Button
                 onClick={() => navigate(`/contracts/${contract.id}/edit`)}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"

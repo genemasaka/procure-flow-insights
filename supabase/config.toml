@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.contract-extractor]
 verify_jwt = false
+
+[functions.generate-insights]
+verify_jwt = false

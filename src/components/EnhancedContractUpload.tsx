@@ -242,14 +242,30 @@ export const EnhancedContractUpload = () => {
       // Update file status
       updateFileStatus(file.id, 'completed', 100);
 
+      // Generate AI insights for the contract
+      try {
+        const insightsResponse = await supabase.functions.invoke('generate-insights', {
+          body: { contractId: contractData.id }
+        });
+        
+        if (insightsResponse.error) {
+          console.error('Error generating insights:', insightsResponse.error);
+        } else {
+          console.log('AI insights generated successfully');
+        }
+      } catch (error) {
+        console.error('Failed to generate insights:', error);
+      }
+
       toast({
         title: "Contract Saved",
-        description: `${file.extractedData.title} has been saved successfully`,
+        description: `${file.extractedData.title} has been saved and AI insights are being generated`,
         variant: "default"
       });
 
-      // Refresh contracts list
+      // Refresh contracts list and insights
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['ai_insights'] });
 
       // Navigate to contract details
       navigate(`/contracts/${contractData.id}`);
