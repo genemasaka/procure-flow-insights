@@ -12,9 +12,10 @@ import { useLocation } from "react-router-dom";
 
 interface DeadlineTimelineProps {
   expanded?: boolean;
+  onAddContract?: () => void;
 }
 
-export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) => {
+export const DeadlineTimeline = ({ expanded = false, onAddContract }: DeadlineTimelineProps) => {
   const { data: deadlines, isLoading, error } = useDeadlines();
   const [actioningDeadline, setActioningDeadline] = useState<string | null>(null);
   const { toast } = useToast();
@@ -138,15 +139,10 @@ export const DeadlineTimeline = ({ expanded = false }: DeadlineTimelineProps) =>
   };
 
   const handleAddContract = () => {
-    // Check if we're on the main dashboard page
-    if (location.pathname === '/') {
-      // Find and click the upload tab
-      const uploadTab = document.querySelector('[value="upload"]') as HTMLButtonElement;
-      if (uploadTab) {
-        uploadTab.click();
-      }
+    if (onAddContract) {
+      onAddContract();
     } else {
-      // Navigate to the dashboard and then switch to upload tab
+      // Fallback: navigate to the dashboard and then switch to upload tab
       window.location.href = '/#upload';
     }
   };
