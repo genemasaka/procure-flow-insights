@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DocumentUpload } from "@/components/DocumentUpload";
+import { EnhancedContractUpload } from "@/components/EnhancedContractUpload";
 import { ContractLibrary } from "@/components/ContractLibrary";
 import { DeadlineTimeline } from "@/components/DeadlineTimeline";
 import { AIInsights } from "@/components/AIInsights";
@@ -99,7 +99,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="upload">
-            <DocumentUpload />
+            <EnhancedContractUpload />
           </TabsContent>
 
           <TabsContent value="library">
