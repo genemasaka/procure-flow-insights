@@ -252,7 +252,7 @@ export const EnhancedContractUpload = () => {
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
 
       // Navigate to contract details
-      navigate(`/contract/${contractData.id}`);
+      navigate(`/contracts/${contractData.id}`);
 
     } catch (error) {
       console.error('Save error:', error);
