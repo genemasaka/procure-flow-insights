@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -220,7 +220,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_all_contract_deadlines: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      generate_contract_deadlines: {
+        Args: { contract_id_param: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
