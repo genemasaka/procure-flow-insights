@@ -74,6 +74,19 @@ const EditContract = () => {
 
   const fetchContractDetails = async () => {
     try {
+      // Check if user is authenticated first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('User not authenticated, redirecting to auth');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to access contracts",
+          variant: "destructive"
+        });
+        navigate('/auth');
+        return;
+      }
+
       console.log('Fetching contract details for ID:', id);
       const { data, error } = await supabase
         .from('contracts')
@@ -83,6 +96,16 @@ const EditContract = () => {
 
       if (error) {
         console.error('Supabase error:', error);
+        if (error.code === 'PGRST116') {
+          // No rows returned
+          toast({
+            title: "Contract Not Found",
+            description: "The requested contract does not exist or you don't have access to it",
+            variant: "destructive"
+          });
+          navigate('/');
+          return;
+        }
         throw error;
       }
       
@@ -110,9 +133,10 @@ const EditContract = () => {
       console.error('Error fetching contract details:', error);
       toast({
         title: "Error",
-        description: "Failed to load contract details",
+        description: `Failed to load contract details: ${error.message || 'Unknown error'}`,
         variant: "destructive"
       });
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -126,6 +150,18 @@ const EditContract = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to update contracts",
+          variant: "destructive"
+        });
+        navigate('/auth');
+        return;
+      }
+
       const updateData = {
         title: formData.title,
         counterparty: formData.counterparty,
@@ -141,12 +177,21 @@ const EditContract = () => {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      console.log('Updating contract with ID:', id);
+      console.log('Update data:', updateData);
+
+      const { data, error } = await supabase
         .from('contracts')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
+
+      console.log('Update successful:', data);
 
       toast({
         title: "Success",
@@ -158,7 +203,7 @@ const EditContract = () => {
       console.error('Error updating contract:', error);
       toast({
         title: "Error",
-        description: "Failed to update contract",
+        description: `Failed to update contract: ${error.message || 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
