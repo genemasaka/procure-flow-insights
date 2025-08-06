@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Brain, TrendingUp, AlertTriangle, Target, Zap, Plus, Lightbulb, CheckCircle } from "lucide-react";
+import { Brain, TrendingUp, AlertTriangle, Target, Zap, Plus, Lightbulb, CheckCircle, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { useAIInsights } from "@/hooks/useContracts";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useNavigate } from 'react-router-dom';
 
 interface AIInsightsProps {
@@ -18,6 +19,7 @@ interface AIInsightsProps {
 export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
   const { data: insights, isLoading, error } = useAIInsights();
   const [actioningInsight, setActioningInsight] = useState<string | null>(null);
+  const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -96,6 +98,19 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
     }
   };
 
+  // Group insights by contract
+  const groupedInsights = insights?.reduce((acc, insight) => {
+    const contractId = insight.contract_id;
+    if (!acc[contractId]) {
+      acc[contractId] = {
+        contract: insight.contracts,
+        insights: []
+      };
+    }
+    acc[contractId].insights.push(insight);
+    return acc;
+  }, {} as Record<string, { contract: any; insights: any[] }>);
+
   // Helper to extract a brief summary from the description or a summary field
   const getInsightSummary = (insight: any) => {
     // If a summary field exists, use it; otherwise, parse description for key points
@@ -113,6 +128,24 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
       return insight.description.split('. ')[0] + '.';
     }
     return 'No summary available.';
+  };
+
+  const toggleContractExpansion = (contractId: string) => {
+    const newExpanded = new Set(expandedContracts);
+    if (newExpanded.has(contractId)) {
+      newExpanded.delete(contractId);
+    } else {
+      newExpanded.add(contractId);
+    }
+    setExpandedContracts(newExpanded);
+  };
+
+  const getContractInsightsSummary = (contractInsights: any[]) => {
+    const riskCount = contractInsights.filter(i => i.insight_type === 'risk').length;
+    const opportunityCount = contractInsights.filter(i => i.insight_type === 'opportunity').length;
+    const highImpactCount = contractInsights.filter(i => i.impact === 'high').length;
+    
+    return { riskCount, opportunityCount, highImpactCount, total: contractInsights.length };
   };
 
   if (isLoading) {
@@ -153,7 +186,8 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
     );
   }
 
-  const displayedInsights = expanded ? insights : insights?.slice(0, 3);
+  const contractEntries = groupedInsights ? Object.entries(groupedInsights) : [];
+  const displayedContracts = expanded ? contractEntries : contractEntries.slice(0, 3);
 
   return (
     <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -177,94 +211,167 @@ export const AIInsights = ({ expanded = false }: AIInsightsProps) => {
               </p>
             </div>
           ) : (
-            displayedInsights?.map((insight) => {
-              const isActioning = actioningInsight === insight.id;
+            displayedContracts.map(([contractId, { contract, insights: contractInsights }]) => {
+              const isExpanded = expandedContracts.has(contractId);
+              const summary = getContractInsightsSummary(contractInsights);
+              const highestImpactInsight = contractInsights.reduce((highest, current) => {
+                const impactOrder = { high: 3, medium: 2, low: 1 };
+                return impactOrder[current.impact] > impactOrder[highest.impact] ? current : highest;
+              }, contractInsights[0]);
               
               return (
-                <div
-                  key={insight.id}
-                  className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {getTypeIcon(insight.insight_type)}
-                      <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
-                        {insight.insight_type}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
-                        {insight.impact} impact
-                      </span>
-                      {insight.actionable && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          Actionable
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
-                  <p className="text-sm text-slate-700 mb-2 font-medium">{getInsightSummary(insight)}</p>
-                  <p className="text-xs text-slate-500 mb-3">{insight.description}</p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500">Confidence:</span>
-                        <Progress value={insight.confidence} className="w-16 h-2" />
-                        <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
+                <Card key={contractId} className="border border-slate-200 bg-slate-50/30">
+                  <Collapsible open={isExpanded} onOpenChange={() => toggleContractExpansion(contractId)}>
+                    <CollapsibleTrigger asChild>
+                      <div className="p-4 cursor-pointer hover:bg-slate-50/50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-slate-600" />
+                            <div>
+                              <h3 className="font-semibold text-slate-900">{contract?.title || 'Unknown Contract'}</h3>
+                              <p className="text-sm text-slate-600">{contract?.counterparty || 'Unknown Counterparty'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              {summary.riskCount > 0 && (
+                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                  {summary.riskCount} Risk{summary.riskCount > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                              {summary.opportunityCount > 0 && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  {summary.opportunityCount} Opportunity{summary.opportunityCount > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                {summary.total} Total
+                              </Badge>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-slate-500" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-slate-500" />
+                            )}
+                          </div>
+                        </div>
+                        
+                        {!isExpanded && (
+                          <div className="mt-3 pl-8">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getTypeIcon(highestImpactInsight.insight_type)}
+                              <Badge variant="outline" className={getTypeColor(highestImpactInsight.insight_type)}>
+                                {highestImpactInsight.insight_type}
+                              </Badge>
+                              <span className={`text-sm font-medium ${getImpactColor(highestImpactInsight.impact)}`}>
+                                {highestImpactInsight.impact} impact
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-700 font-medium">{highestImpactInsight.title}</p>
+                            <p className="text-xs text-slate-500 mt-1">{getInsightSummary(highestImpactInsight)}</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    {insight.actionable && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            size="sm" 
-                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                            disabled={isActioning}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Take Action
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}`)}>
-                            View Contract Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit`)}>
-                            Edit Contract
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit#deadlines`)}>
-                            Add/Edit Deadline
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTakeAction(insight.id, insight.title)}>
-                            Mark as Reviewed
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => window.open(`/api/contracts/${insight.contract_id}/download`, '_blank')}>
-                            Download Contract
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert('Notify stakeholders feature coming soon!')}>
-                            Notify Stakeholders
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent>
+                      <div className="px-4 pb-4 border-t border-slate-200">
+                        <div className="space-y-3 mt-4">
+                          {contractInsights.map((insight) => {
+                            const isActioning = actioningInsight === insight.id;
+                            
+                            return (
+                              <div
+                                key={insight.id}
+                                className="p-3 rounded-lg border border-slate-200 bg-white"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    {getTypeIcon(insight.insight_type)}
+                                    <Badge variant="outline" className={getTypeColor(insight.insight_type)}>
+                                      {insight.insight_type}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-sm font-medium ${getImpactColor(insight.impact)}`}>
+                                      {insight.impact} impact
+                                    </span>
+                                    {insight.actionable && (
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                        Actionable
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <h4 className="font-semibold text-slate-900 mb-2">{insight.title}</h4>
+                                <p className="text-sm text-slate-700 mb-2 font-medium">{getInsightSummary(insight)}</p>
+                                <p className="text-xs text-slate-500 mb-3">{insight.description}</p>
+
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-slate-500">Confidence:</span>
+                                      <Progress value={insight.confidence} className="w-16 h-2" />
+                                      <span className="text-xs font-medium text-slate-700">{insight.confidence}%</span>
+                                    </div>
+                                  </div>
+                                  {insight.actionable && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button 
+                                          size="sm" 
+                                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                                          disabled={isActioning}
+                                        >
+                                          <CheckCircle className="w-4 h-4 mr-1" />
+                                          Take Action
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}`)}>
+                                          View Contract Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit`)}>
+                                          Edit Contract
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => navigate(`/contracts/${insight.contract_id}/edit#deadlines`)}>
+                                          Add/Edit Deadline
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleTakeAction(insight.id, insight.title)}>
+                                          Mark as Reviewed
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => window.open(`/api/contracts/${insight.contract_id}/download`, '_blank')}>
+                                          Download Contract
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => alert('Notify stakeholders feature coming soon!')}>
+                                          Notify Stakeholders
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
               );
             })
           )}
         </div>
 
-        {!expanded && insights && insights.length > 3 && (
+        {!expanded && contractEntries.length > 3 && (
           <div className="mt-4 pt-4 border-t border-slate-200">
             <Button 
               variant="outline" 
               className="w-full"
               onClick={() => window.location.href = '/insights'}
             >
-              View All Insights ({insights.length - 3} more)
+              View All Contracts ({contractEntries.length - 3} more)
             </Button>
           </div>
         )}
