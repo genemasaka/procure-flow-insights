@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ArrowLeft, FileText, Calendar, DollarSign, User, Edit, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GenerateInsightsButton } from "@/components/GenerateInsightsButton";
+import { formatCurrency } from "@/lib/contractUtils";
 
 interface Contract {
   id: string;
@@ -76,13 +77,6 @@ const ContractDetails = () => {
     }
   };
 
-  const formatCurrency = (value: number | null, currency: string | null) => {
-    if (!value) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD'
-    }).format(value);
-  };
 
   if (loading) {
     return (

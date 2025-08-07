@@ -4,9 +4,28 @@ import { Progress } from "@/components/ui/progress";
 import { TrendingUp, TrendingDown, Calendar, Shield, DollarSign, FileText } from "lucide-react";
 import { useContracts } from "@/hooks/useContracts";
 import { calculateContractMetrics, formatCurrency } from "@/lib/contractUtils";
+import { useState, useEffect } from "react";
+import { fetchExchangeRates, aggregatePortfolioValue } from "@/lib/currencyUtils";
 
 export const ContractMetrics = () => {
   const { data: contracts, isLoading, error } = useContracts();
+  const [defaultCurrency, setDefaultCurrency] = useState(() => localStorage.getItem('defaultCurrency') || 'USD');
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    fetchExchangeRates(defaultCurrency).then(setExchangeRates);
+  }, [defaultCurrency]);
+
+  // Listen for localStorage changes to update currency in real-time
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newCurrency = localStorage.getItem('defaultCurrency') || 'USD';
+      setDefaultCurrency(newCurrency);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   if (isLoading) {
     return (
@@ -38,6 +57,7 @@ export const ContractMetrics = () => {
 
   const metrics = calculateContractMetrics(contracts);
   const riskScore = Math.max(0, 100 - (metrics.expiring * 10));
+  const aggregatedValue = exchangeRates ? aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates) : null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -103,7 +123,9 @@ export const ContractMetrics = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-blue-600">{formatCurrency(metrics.totalValue)}</div>
+          <div className="text-2xl font-bold text-blue-600">
+            {aggregatedValue !== null ? formatCurrency(aggregatedValue, defaultCurrency) : 'Loading...'}
+          </div>
           <Progress value={riskScore} className="mt-2" />
           <span className="text-sm text-slate-500 mt-1">Risk Score: {riskScore}</span>
         </CardContent>

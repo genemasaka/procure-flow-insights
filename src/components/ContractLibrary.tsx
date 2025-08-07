@@ -9,6 +9,7 @@ import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
 import { sumContractValues, averageContractValue, daysBetween, riskScore } from '@/lib/utils';
 import { fetchExchangeRates, aggregatePortfolioValue } from '@/lib/currencyUtils';
+import { formatCurrency } from '@/lib/contractUtils';
 
 export const ContractLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +21,17 @@ export const ContractLibrary = () => {
   useEffect(() => {
     fetchExchangeRates(defaultCurrency).then(setExchangeRates);
   }, [defaultCurrency]);
+
+  // Listen for localStorage changes to update currency in real-time
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newCurrency = localStorage.getItem('defaultCurrency') || 'USD';
+      setDefaultCurrency(newCurrency);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const { data: contracts, isLoading, error } = useContracts();
 
@@ -48,13 +60,6 @@ export const ContractLibrary = () => {
     }
   };
 
-  const formatCurrency = (value: number | null) => {
-    if (!value) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(value);
-  };
 
   const handleViewDetails = (contractId: string) => {
     window.location.href = `/contracts/${contractId}`;
@@ -159,9 +164,9 @@ export const ContractLibrary = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {aggregatedValue !== null ? `${aggregatedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${defaultCurrency}` : 'Loading...'}
+              {aggregatedValue !== null ? formatCurrency(aggregatedValue, defaultCurrency) : 'Loading...'}
             </div>
-            <div className="text-sm text-slate-500">Average: {avgValue.toLocaleString()}</div>
+            <div className="text-sm text-slate-500">Average: {formatCurrency(avgValue, defaultCurrency)}</div>
           </CardContent>
         </Card>
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
@@ -225,9 +230,9 @@ export const ContractLibrary = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-slate-900 mb-1">
-                      {formatCurrency(contract.contract_value)}
-                    </div>
+                     <div className="text-2xl font-bold text-slate-900 mb-1">
+                       {formatCurrency(contract.contract_value, contract.currency)}
+                     </div>
                     <div className="text-sm text-slate-500">Contract Value</div>
                   </div>
                 </div>

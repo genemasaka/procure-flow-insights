@@ -58,11 +58,16 @@ export const getDeadlineUrgency = (deadline: Deadline) => {
   return 'normal';
 };
 
-export const formatCurrency = (value: number | null, currency: string = 'USD') => {
+export const formatCurrency = (value: number | null, currency?: string) => {
   if (!value) return 'N/A';
+  
+  // Get user's default currency from localStorage, fallback to USD
+  const defaultCurrency = localStorage.getItem('defaultCurrency') || 'USD';
+  const displayCurrency = currency || defaultCurrency;
+  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency: displayCurrency,
   }).format(value);
 };
 
