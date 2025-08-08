@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Calendar, Shield, DollarSign, FileText } from
 import { useContracts } from "@/hooks/useContracts";
 import { calculateContractMetrics, formatCurrency } from "@/lib/contractUtils";
 import { useState, useEffect } from "react";
-import { fetchExchangeRates, aggregatePortfolioValue } from "@/lib/currencyUtils";
+import { fetchExchangeRates, aggregatePortfolioValue, getFallbackPortfolioValue } from "@/lib/currencyUtils";
 
 export const ContractMetrics = () => {
   const { data: contracts, isLoading, error } = useContracts();
@@ -57,7 +57,17 @@ export const ContractMetrics = () => {
 
   const metrics = calculateContractMetrics(contracts);
   const riskScore = Math.max(0, 100 - (metrics.expiring * 10));
-  const aggregatedValue = exchangeRates ? aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates) : null;
+  
+  // Try to get aggregated value with exchange rates, fallback to same-currency contracts
+  let portfolioValue: number;
+  let valueNote = '';
+  
+  if (exchangeRates && Object.keys(exchangeRates).length > 0) {
+    portfolioValue = aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates);
+  } else {
+    portfolioValue = getFallbackPortfolioValue(contracts, defaultCurrency);
+    valueNote = ' (same currency only)';
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -124,8 +134,13 @@ export const ContractMetrics = () => {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-blue-600">
-            {aggregatedValue !== null ? formatCurrency(aggregatedValue, defaultCurrency) : 'Loading...'}
+            {formatCurrency(portfolioValue, defaultCurrency)}
           </div>
+          {valueNote && (
+            <div className="text-xs text-slate-500">
+              {valueNote}
+            </div>
+          )}
           <Progress value={riskScore} className="mt-2" />
           <span className="text-sm text-slate-500 mt-1">Risk Score: {riskScore}</span>
         </CardContent>

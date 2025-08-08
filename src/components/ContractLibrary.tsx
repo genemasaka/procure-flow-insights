@@ -8,7 +8,7 @@ import { Search, FileText, Calendar, DollarSign, Upload, Eye, Edit, AlertTriangl
 import { useContracts } from "@/hooks/useContracts";
 import { format } from "date-fns";
 import { sumContractValues, averageContractValue, daysBetween, riskScore } from '@/lib/utils';
-import { fetchExchangeRates, aggregatePortfolioValue } from '@/lib/currencyUtils';
+import { fetchExchangeRates, aggregatePortfolioValue, getFallbackPortfolioValue } from '@/lib/currencyUtils';
 import { formatCurrency } from '@/lib/contractUtils';
 
 export const ContractLibrary = () => {
@@ -111,7 +111,14 @@ export const ContractLibrary = () => {
   const avgValue = averageContractValue(contracts);
   const soonExpiring = contracts.filter(c => c.expiration_date && daysBetween(new Date(), c.expiration_date) <= 30).length;
   const portfolioRisk = riskScore(totalValue, soonExpiring);
-  const aggregatedValue = exchangeRates ? aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates) : null;
+  
+  // Get portfolio value with fallback
+  let portfolioValue: number;
+  if (exchangeRates && Object.keys(exchangeRates).length > 0) {
+    portfolioValue = aggregatePortfolioValue(contracts, defaultCurrency, exchangeRates);
+  } else {
+    portfolioValue = getFallbackPortfolioValue(contracts, defaultCurrency);
+  }
 
   return (
     <div className="space-y-6">
@@ -164,7 +171,7 @@ export const ContractLibrary = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {aggregatedValue !== null ? formatCurrency(aggregatedValue, defaultCurrency) : 'Loading...'}
+              {formatCurrency(portfolioValue, defaultCurrency)}
             </div>
             <div className="text-sm text-slate-500">Average: {formatCurrency(avgValue, defaultCurrency)}</div>
           </CardContent>
